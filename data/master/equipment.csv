@@ -1,0 +1,13 @@
+equip_code,equip_name,wc_code,equip_type,maker,model,install_year,ideal_ct_min,planned_min_per_day,auto_collect,note
+CNC01,CNC 선반 #1,WC-100,CNC_LATHE,DOOSAN,PUMA 2600,2019,12,960,Y,주간 2교대 (8h×2)
+CNC02,CNC 선반 #2,WC-100,CNC_LATHE,DOOSAN,PUMA 2600,2020,12,960,Y,주간 2교대 (8h×2)
+CNC03,CNC 밀링 #1,WC-200,CNC_MILL,HYUNDAI WIA,F500,2018,18,960,Y,노후 설비
+CNC04,CNC 밀링 #2,WC-200,CNC_MILL,HYUNDAI WIA,F500D,2021,18,960,Y,주간 2교대 (8h×2)
+CNC05,연삭기,WC-400,GRINDER,STUDER,S33,2019,8,960,Y,주간 2교대 (8h×2)
+HTF-01,열처리로,WC-300,FURNACE,,,,,,N,Batch 최대 200개 (외주 병행)
+USC-01,초음파 세척기,WC-500,WASHER,,,,,,N,Batch 50개
+CMM-01,3차원 측정기,WC-600,MEASURE,,,,,,N,
+HT-01,경도시험기,WC-600,MEASURE,,,,,,N,
+SR-01,표면조도측정기,WC-600,MEASURE,,,,,,N,
+HP-01,유압 프레스,WC-700,PRESS,,,,,,N,키홈 핀 압입
+PKG-01,포장대,WC-700,PACKING,,,,,,N,

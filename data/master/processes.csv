@@ -1,0 +1,8 @@
+process_code,process_name,process_name_en,department
+OP-10,CNC 선삭,Turning,생산1팀
+OP-20,CNC 밀링,Milling,생산1팀
+OP-30,열처리,Heat Treatment,생산2팀
+OP-40,연삭,Grinding,생산2팀
+OP-50,세척,Cleaning,생산2팀
+OP-60,최종 검사,Final Inspection,품질팀
+OP-70,조립 및 포장,Assembly & Packing,물류팀

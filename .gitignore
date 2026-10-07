@@ -1,0 +1,32 @@
+# 부트캠프 원본 자료: 거래처 실명이 포함되어 공개 저장소에 올리지 않음
+data/raw/
+/*.xlsx
+/*.pptx
+~$*
+
+# Java / Spring (server)
+server/build/
+server/.gradle/
+server/out/
+*.class
+
+# .NET (pop, simulator)
+bin/
+obj/
+*.user
+.vs/
+
+# Python (tools)
+__pycache__/
+*.pyc
+.venv/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+.DS_Store
+
+# 환경 변수
+.env

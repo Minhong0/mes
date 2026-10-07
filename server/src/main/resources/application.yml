@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: mes-server
+  datasource:
+    url: jdbc:sqlserver://${DB_HOST:localhost}:${DB_PORT:1433};databaseName=${DB_NAME:minimes};encrypt=true;trustServerCertificate=true
+    username: ${DB_USERNAME:sa}
+    password: ${MSSQL_SA_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: none   # 스키마는 db/ddl의 SQL로 관리
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  thymeleaf:
+    cache: false
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+mes:
+  mqtt:
+    broker-url: ${MQTT_URL:tcp://localhost:1883}

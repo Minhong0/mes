@@ -1,0 +1,15 @@
+process_code,inspect_code,inspect_name,equip_code,unit,nominal,lsl,usl
+OP-10,OD,외경,,mm,38,37.95,38.05
+OP-10,RA,표면 거칠기,,µm,,,3.2
+OP-20,KW,키홈 폭,,mm,5.0,4.98,5.02
+OP-20,PCD,스플라인 PCD,,mm,32,31.97,32.03
+OP-30,HRC,표면 경도,HT-01,HRC,,58,62
+OP-30,CD,유효 경화 깊이,,mm,,0.8,1.2
+OP-40,OD,외경,,mm,35,34.99,35.01
+OP-40,RND,진원도,,mm,,,0.005
+OP-40,RA,표면 거칠기,,µm,,,0.8
+OP-60,OD,외경,CMM-01,mm,35,34.99,35.01
+OP-60,KW,키홈 폭,CMM-01,mm,5.0,4.98,5.02
+OP-60,PCD,스플라인 PCD,CMM-01,mm,32,31.97,32.03
+OP-60,HRC,표면 경도,HT-01,HRC,,58,62
+OP-60,RA,표면 거칠기,SR-01,µm,,,0.8

@@ -1,0 +1,11 @@
+item_code,item_name,item_type,spec,unit,note
+FG-SFT-100,변속기 메인 샤프트 ASSY,FG,Ø35×L280mm,EA,최종 출하품
+SF-SFT-010,1차 가공 샤프트,SF,Ø38×L285mm,EA,OP-10 산출물
+SF-SFT-020,2차 정밀 샤프트,SF,Ø35.5×L282mm,EA,OP-20 산출물
+SF-SFT-030,열처리 샤프트,SF,Ø35.5×L282mm,EA,OP-30 산출물
+SF-SFT-040,연삭 샤프트,SF,Ø35×L280mm,EA,OP-40 산출물
+RM-SCM-001,SCM440 환봉,RM,Ø40×L300mm,EA,크롬몰리브덴강
+RM-KEY-001,키홈 핀,RM,Ø5×L15mm,EA,SUS304
+RM-OIL-001,절삭유,RM,,L,수용성 소모품
+RM-GRD-001,연삭석,RM,Ø200mm,EA,소모성 공구 (약 200개 가공)
+RM-PKG-001,포장 트레이,RM,20구,EA,PP 소재
