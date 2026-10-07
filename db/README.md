@@ -25,3 +25,22 @@ done
 - `-I`: sqlcmd는 기본으로 `QUOTED_IDENTIFIER`가 꺼져 있어, 계산 컬럼(`production_daily.run_min`)이 있는 테이블에 쓰기가 실패합니다. 스크립트 안에도 `SET QUOTED_IDENTIFIER ON`을 넣어 두었습니다.
 - `-f 65001`: 한글 주석과 데이터를 UTF-8로 읽습니다.
 - 처음부터 다시 만들려면 먼저 `DROP DATABASE minimes`를 실행합니다.
+
+## 초기 데이터 (seed)
+
+```bash
+python tools/import_excel.py          # data/master CSV + 2차 엑셀 → db/seed/*.sql (검증 포함)
+docker exec minimes-mssql mkdir -p /tmp/seed
+docker cp db/seed/. minimes-mssql:/tmp/seed/
+for f in 01_master.sql 02_history.sql; do
+  docker exec minimes-mssql /opt/mssql-tools18/bin/sqlcmd \
+    -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -I -b -f 65001 -i /tmp/seed/$f
+done
+```
+
+| 파일 | 내용 | 다시 실행 |
+| --- | --- | --- |
+| `seed/01_master.sql` | 기준정보 (공통코드 38, 품목 10, BOM 10, 공정 7, 작업장 7, 라우팅 7, 설비 12, 검사 규격 14) | 빈 DB에서 한 번만 |
+| `seed/02_history.sql` | 부트캠프 2025년 10월 실적 (일별 실적 115, 비가동 220) | 가능 (기존 BOOTCAMP 데이터를 지우고 다시 넣음) |
+
+seed 파일은 자동 생성 파일이므로 직접 고치지 말고, CSV나 스크립트를 고친 뒤 다시 생성합니다.
