@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.minimes.master.mapper.BomMapper">
+
+    <!--
+        재귀 CTE로 BOM을 펼친다.
+        1) 앵커: 시작 품목 한 줄 (Level 0)
+        2) 재귀: 방금 찾은 품목의 하위 품목을 bom에서 찾아 Level을 1 올린다. 더 이상 하위가 없으면 멈춘다.
+        sort_path는 "FG-SFT-100>SF-SFT-040>..." 형태의 경로로, 트리 모양 순서로 정렬하는 데 쓴다.
+        MAXRECURSION은 BOM이 잘못 등록되어 순환(A→B→A)할 때 무한 반복을 막는다.
+    -->
+    <select id="selectBomTree" resultType="com.minimes.master.mapper.BomNode">
+        WITH bom_tree AS (
+            SELECT
+                0                                  AS bom_level,
+                CAST(NULL AS VARCHAR(20))          AS parent_item_code,
+                i.item_code,
+                CAST(1 AS DECIMAL(18, 4))          AS qty_per_parent,
+                CAST(1 AS DECIMAL(18, 4))          AS total_qty,
+                CAST(NULL AS VARCHAR(10))          AS process_code,
+                CAST(i.item_code AS VARCHAR(400))  AS sort_path
+            FROM item i
+            WHERE i.item_code = #{itemCode}
+
+            UNION ALL
+
+            SELECT
+                t.bom_level + 1,
+                b.parent_item_code,
+                b.child_item_code,
+                CAST(b.qty AS DECIMAL(18, 4)),
+                CAST(t.total_qty * b.qty AS DECIMAL(18, 4)),
+                b.process_code,
+                CAST(t.sort_path + '>' + b.child_item_code AS VARCHAR(400))
+            FROM bom_tree t
+            JOIN bom b ON b.parent_item_code = t.item_code
+        )
+        SELECT
+            t.bom_level,
+            t.parent_item_code,
+            t.item_code,
+            i.item_name,
+            i.item_type,
+            i.unit,
+            t.qty_per_parent,
+            t.total_qty,
+            t.process_code
+        FROM bom_tree t
+        JOIN item i ON i.item_code = t.item_code
+        ORDER BY t.sort_path
+        OPTION (MAXRECURSION 20)
+    </select>
+
+</mapper>

@@ -1,13 +1,17 @@
 spring:
   application:
     name: mes-server
+  config:
+    # 저장소 루트의 .env(MSSQL_SA_PASSWORD 등)를 설정으로 읽는다. 파일이 없으면 무시한다.
+    # server 폴더에서 실행하면 ../.env, 저장소 루트에서 실행하면 .env를 찾는다.
+    import: "optional:file:../.env[.properties],optional:file:.env[.properties]"
   datasource:
     url: jdbc:sqlserver://${DB_HOST:localhost}:${DB_PORT:1433};databaseName=${DB_NAME:minimes};encrypt=true;trustServerCertificate=true
     username: ${DB_USERNAME:sa}
     password: ${MSSQL_SA_PASSWORD:}
   jpa:
     hibernate:
-      ddl-auto: none   # 스키마는 db/ddl의 SQL로 관리
+      ddl-auto: validate   # 스키마는 db/ddl의 SQL로 관리하고, 시작할 때 엔티티와 DB 구조가 맞는지만 검사한다
     open-in-view: false
     properties:
       hibernate:
@@ -18,7 +22,13 @@ spring:
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
   configuration:
-    map-underscore-to-camel-case: true
+    map-underscore-to-camel-case: true          # bom_level 컬럼 → bomLevel
+    arg-name-based-constructor-auto-mapping: true   # record(BomNode)를 생성자 파라미터 이름으로 매핑
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
 
 management:
   endpoints:

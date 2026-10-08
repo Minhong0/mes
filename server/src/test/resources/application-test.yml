@@ -1,0 +1,11 @@
+# test 프로필: 기본 설정(application.yml) 위에 DB 설정만 덮어쓴다.
+# 기본 테스트(./gradlew test)는 MSSQL 없이 H2 메모리 DB로 실행하고,
+# 실제 MSSQL 스키마 검증은 통합 테스트(./gradlew integrationTest)에서 한다.
+spring:
+  datasource:
+    url: jdbc:h2:mem:minimes;MODE=MSSQLServer;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop   # 엔티티 구조대로 테이블을 만들고 테스트가 끝나면 지운다

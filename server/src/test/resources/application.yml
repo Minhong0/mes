@@ -1,9 +1,0 @@
-# 테스트는 MSSQL 없이 H2(MSSQL 호환 모드)로 실행
-spring:
-  datasource:
-    url: jdbc:h2:mem:minimes;MODE=MSSQLServer;DB_CLOSE_DELAY=-1
-    username: sa
-    password:
-  jpa:
-    hibernate:
-      ddl-auto: none
