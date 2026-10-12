@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using MQTTnet;
 using MQTTnet.Protocol;
 
@@ -9,8 +10,12 @@ namespace MiniMes.Simulator;
 /// </summary>
 public sealed class MqttPublisher : IAsyncDisposable
 {
-    // JSON 필드 이름을 서버(Java) 관례인 camelCase로 맞춘다.
-    private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    // JSON 필드 이름을 서버(Java) 관례인 camelCase로 맞추고, 값이 null인 필드(가동 중의 정지 사유)는 JSON에서 뺀다.
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
     private readonly IMqttClient _client;
 

@@ -19,11 +19,11 @@ Console.CancelKeyPress += (_, e) =>
     cts.Cancel();
 };
 
-// 1) 기준정보 CSV에서 시뮬레이션할 설비 목록 읽기
-var csvPath = EquipmentSpec.FindCsvPath();
-var specs = EquipmentSpec.LoadFromCsv(csvPath);
-Console.WriteLine($"설비 {specs.Count}대: " + string.Join(", ", specs.Select(s => $"{s.EquipCode}({s.IdealCycleMinutes}분)")));
-Console.WriteLine($"배속 x{speed}: 시뮬레이션 1분 = 현실 {60 / speed:0.##}초");
+// 1) 기준정보 CSV에서 시뮬레이션할 설비 목록, 부트캠프 정지 기록 읽기
+var specs = EquipmentSpec.LoadFromCsv(RepoPaths.Find("data", "master", "equipment.csv"));
+var history = DowntimeHistory.LoadFromCsv(RepoPaths.Find("data", "profile", "downtime_events.csv"));
+Console.WriteLine($"설비 {specs.Count}대: " + string.Join(", ", specs.Select(s => $"{s.EquipCode}({s.IdealCycleMinutes}분, 정지 기록 {history.For(s.EquipCode).Count}건)")));
+Console.WriteLine($"배속 x{speed}: 시뮬레이션 1분 = 현실 {60 / speed:0.####}초");
 
 // 2) 브로커 연결 (설비 5대가 연결 하나를 함께 쓴다)
 await using var publisher = await MqttPublisher.ConnectAsync(BrokerHost, BrokerPort, cts.Token);
@@ -33,7 +33,7 @@ Console.WriteLine($"브로커 연결: {BrokerHost}:{BrokerPort}");
 var clock = new SimulationClock(speed);
 var runId = DateTimeOffset.Now.ToString("yyMMddHHmmss");   // 실행마다 다른 값: 재시작해도 messageId가 겹치지 않게
 var tasks = specs
-    .Select((spec, index) => new SimulatedEquipment(spec, publisher, clock, runId, seed: Environment.TickCount + index))
+    .Select((spec, index) => new SimulatedEquipment(spec, history, publisher, clock, runId, seed: Environment.TickCount + index))
     .Select(equipment => equipment.RunAsync(cts.Token))
     .ToList();
 
@@ -51,6 +51,7 @@ Console.WriteLine("시뮬레이터 종료");
 static double ReadSpeed(string[] args)
 {
     var index = Array.IndexOf(args, "--speed");
+    // CultureInfo.InvariantCulture : 나라별 숫자 표기 차이를 무시하고 항상 .을 소수점으로 읽게 함 실무에서 중요해보임.
     if (index >= 0 && index + 1 < args.Length && double.TryParse(args[index + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value > 0)
     {
         return value;

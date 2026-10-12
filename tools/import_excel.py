@@ -7,6 +7,7 @@
 출력
   db/seed/01_master.sql          기준정보 INSERT
   db/seed/02_history.sql         부트캠프 과거 실적 INSERT (production_daily, downtime)
+  data/profile/downtime_events.csv  설비 시뮬레이터가 재현할 실제 정지 기록 (날짜, 설비, 사유 코드, 정지 시간)
 
 실행
   python tools/import_excel.py
@@ -31,6 +32,7 @@ ROOT = Path(__file__).resolve().parent.parent
 MASTER_DIR = ROOT / "data" / "master"
 RAW_DIR = ROOT / "data" / "raw"
 SEED_DIR = ROOT / "db" / "seed"
+PROFILE_DIR = ROOT / "data" / "profile"
 
 # MSSQL은 INSERT ... VALUES 한 문장에 최대 1000행까지 허용한다.
 MAX_ROWS_PER_INSERT = 1000
@@ -373,6 +375,14 @@ def build_history_sql(daily: list[DailyRow], downtime: list[DowntimeRow]) -> str
 
 # ---------------------------------------------------------------------------
 
+def build_downtime_events_csv(downtime: list[DowntimeRow]) -> str:
+    """시뮬레이터용 정지 기록. 원본의 한글 사유 대신 코드만 담고, 거래처 등 다른 정보는 넣지 않는다."""
+    lines = ["prod_date,equip_code,dt_cat,dt_sub,duration_min"]
+    for r in sorted(downtime, key=lambda x: (x.started_at, x.equip_code)):
+        lines.append(f"{r.started_at.date().isoformat()},{r.equip_code},{r.dt_cat},{r.dt_sub},{r.duration_min}")
+    return "\n".join(lines) + "\n"
+
+
 def write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8", newline="\n")
@@ -403,6 +413,7 @@ def main() -> int:
 
     write(SEED_DIR / "01_master.sql", build_master_sql(master))
     write(SEED_DIR / "02_history.sql", build_history_sql(daily, downtime))
+    write(PROFILE_DIR / "downtime_events.csv", build_downtime_events_csv(downtime))
     return 0
 
 
