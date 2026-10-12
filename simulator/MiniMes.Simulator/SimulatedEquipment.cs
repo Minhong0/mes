@@ -62,7 +62,7 @@ public sealed class SimulatedEquipment
     {
         _simNow = _clock.NowMinutes;
         ScheduleNextStop();
-        await PublishAsync(ct);   // 시작 상태(RUN)를 먼저 알린다
+        Publish();   // 시작 상태(RUN)를 먼저 알린다
 
         while (!ct.IsCancellationRequested)
         {
@@ -72,7 +72,7 @@ public sealed class SimulatedEquipment
             await _clock.WaitUntil(_simNow, ct);
             ct.ThrowIfCancellationRequested();   // 이미 지난 시각이면 기다리지 않으므로, 취소 여부를 직접 확인한다
             _cycleCount++;
-            await PublishAsync(ct);
+            Publish();
 
             // 2) 정지 시각이 지났으면 멈춘다. 가공 도중이 아니라 사이클이 끝난 뒤에 멈추는 것으로 단순화했다.
             if (_nextStop != null && _simNow >= _nextStopAtMinutes)
@@ -104,7 +104,7 @@ public sealed class SimulatedEquipment
     {
         _currentStop = stop;
         _status = stop.Category == "SETUP" ? "SETUP" : "DOWN";   // 셋업은 계획된 정지라 고장과 구분한다
-        await PublishAsync(ct);
+        Publish();
 
         _simNow += stop.DurationMinutes;
         await _clock.WaitUntil(_simNow, ct);
@@ -112,7 +112,7 @@ public sealed class SimulatedEquipment
 
         _currentStop = null;
         _status = "RUN";
-        await PublishAsync(ct);
+        Publish();
     }
 
     /// <summary>
@@ -129,7 +129,7 @@ public sealed class SimulatedEquipment
         return Math.Clamp(1 - minutesLeft / WarningWindowMinutes, 0, 1);
     }
 
-    private async Task PublishAsync(CancellationToken ct)
+    private void Publish()
     {
         _sequence++;
         var (vibration, temp) = ReadSensors();
@@ -144,7 +144,7 @@ public sealed class SimulatedEquipment
             DowntimeCategory: _currentStop?.Category,   // ?. : _currentStop이 null이면 결과도 null
             DowntimeReason: _currentStop?.Reason);
 
-        await _publisher.PublishAsync(message, ct);
+        _publisher.Enqueue(message);   // 버퍼에 적기만 한다. 실제 전송은 MqttPublisher가 따로 한다
 
         var reason = _currentStop == null ? "" : $"  사유 {_currentStop.Reason} {_currentStop.DurationMinutes}분";
         Console.WriteLine($"[{_spec.EquipCode}] {_status,-5} 누적 {_cycleCount,3}개  진동 {vibration,4} mm/s  온도 {temp} °C{reason}");

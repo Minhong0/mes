@@ -25,9 +25,11 @@ var history = DowntimeHistory.LoadFromCsv(RepoPaths.Find("data", "profile", "dow
 Console.WriteLine($"설비 {specs.Count}대: " + string.Join(", ", specs.Select(s => $"{s.EquipCode}({s.IdealCycleMinutes}분, 정지 기록 {history.For(s.EquipCode).Count}건)")));
 Console.WriteLine($"배속 x{speed}: 시뮬레이션 1분 = 현실 {60 / speed:0.####}초");
 
-// 2) 브로커 연결 (설비 5대가 연결 하나를 함께 쓴다)
-await using var publisher = await MqttPublisher.ConnectAsync(BrokerHost, BrokerPort, cts.Token);
-Console.WriteLine($"브로커 연결: {BrokerHost}:{BrokerPort}");
+// 2) 로컬 버퍼와 보내는 담당 준비. 연결은 보내는 담당이 알아서 하므로, 브로커가 꺼져 있어도 시뮬레이터는 시작한다.
+var bufferPath = Path.Combine(AppContext.BaseDirectory, "outbox.db");
+using var buffer = new MessageBuffer(bufferPath);
+Console.WriteLine($"로컬 버퍼: {bufferPath} (이전 실행에서 못 보낸 메시지 {buffer.Count()}건)");
+await using var publisher = new MqttPublisher(BrokerHost, BrokerPort, buffer);
 
 // 3) 설비마다 작업(Task)을 하나씩 시작하고, 모두 끝날 때까지 기다린다
 var clock = new SimulationClock(speed);
@@ -36,6 +38,7 @@ var tasks = specs
     .Select((spec, index) => new SimulatedEquipment(spec, history, publisher, clock, runId, seed: Environment.TickCount + index))
     .Select(equipment => equipment.RunAsync(cts.Token))
     .ToList();
+tasks.Add(publisher.RunAsync(cts.Token));   // 보내는 담당도 설비와 나란히 돈다
 
 try
 {
@@ -46,7 +49,7 @@ catch (OperationCanceledException)
     // Ctrl+C로 취소된 경우. 정상 종료이므로 아무것도 하지 않는다.
 }
 
-Console.WriteLine("시뮬레이터 종료");
+Console.WriteLine($"시뮬레이터 종료 (못 보낸 메시지 {buffer.Count()}건은 다음 실행 때 보냄)");
 
 static double ReadSpeed(string[] args)
 {
