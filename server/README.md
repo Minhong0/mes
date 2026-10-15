@@ -11,9 +11,27 @@ Java 21, Spring Boot 4.0, JPA + MyBatis, MSSQL.
 
 ## 실행
 
-1. 저장소 루트에서 `docker compose up -d`로 MSSQL을 띄웁니다. DB와 초기 데이터는 [db/README.md](../db/README.md)를 참고하세요.
+1. 저장소 루트에서 `docker compose up -d`로 MSSQL과 MQTT 브로커를 띄웁니다. DB와 초기 데이터는 [db/README.md](../db/README.md)를 참고하세요.
 2. `MesServerApplication`의 ▶ 버튼으로 실행합니다. DB 비밀번호는 저장소 루트의 `.env`에서 자동으로 읽습니다.
 3. http://localhost:8080/swagger-ui.html 에서 API를 확인하고 직접 호출해 볼 수 있습니다.
+4. 설비 시뮬레이터(`simulator/MiniMes.Simulator`에서 `dotnet run`)를 실행하면, 서버의 MQTT 수집기가 메시지를 받아 `equipment_data`에 저장합니다.
+
+## 설비 데이터 수집 (MQTT)
+
+```
+시뮬레이터(C#) ──QoS 1──▶ Mosquitto ──QoS 1──▶ MqttCollector ──▶ EquipmentDataService ──▶ equipment_data
+```
+
+| 상황 | 동작 |
+| --- | --- |
+| 서버가 꺼져 있음 | 영속 세션(`cleanSession=false`, 고정 client-id)이라 브로커가 메시지를 보관하고, 서버가 다시 접속하면 보냅니다. |
+| 브로커가 꺼져 있음 | 시뮬레이터가 로컬 버퍼에 쌓아 두고, 서버는 지수 백오프로 재접속합니다. 서버 API는 브로커 없이도 뜹니다. |
+| 같은 메시지가 두 번 옴 | `messageId`로 걸러 한 번만 저장합니다 (UNIQUE 제약이 2차 방어). |
+| DB 저장 실패 | 수신 확인을 보내지 않아 브로커가 다시 보냅니다. |
+| 깨진 JSON, 모르는 설비 | 로그를 남기고 버립니다. |
+
+설정은 `application.yml`의 `mes.mqtt.*`에 있습니다. 테스트 프로필은 `mes.mqtt.enabled: false`로 수집기를 끄고 실행합니다.
+저장 내용을 한 건씩 보려면 `logging.level.com.minimes.equipment`를 `debug`로 바꿉니다.
 
 ## 테스트
 
@@ -39,11 +57,16 @@ com.minimes
 │  ├─ mapper      MyBatis (BOM 재귀 쿼리) → resources/mapper/master/BomMapper.xml
 │  ├─ service
 │  └─ web         REST 컨트롤러, 응답 DTO
-└─ workorder      작업지시 (생성, 상태 변경)
-   ├─ domain      WorkOrder(상태 규칙), WorkOrderOperation
+├─ workorder      작업지시 (생성, 상태 변경)
+│  ├─ domain      WorkOrder(상태 규칙), WorkOrderOperation
+│  ├─ repository
+│  ├─ service
+│  └─ web
+└─ equipment      설비 데이터 수집
+   ├─ domain      EquipmentData (equipment_data 한 행)
    ├─ repository
-   ├─ service
-   └─ web
+   ├─ service     EquipmentDataService (중복 확인, 시간대 변환, 저장)
+   └─ mqtt        MqttCollector (구독, 재접속), EquipmentMessage, MqttProperties
 ```
 
 ## API

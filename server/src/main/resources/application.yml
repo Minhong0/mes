@@ -30,6 +30,10 @@ springdoc:
     path: /swagger-ui.html
     operations-sorter: method
 
+logging:
+  level:
+    com.minimes.equipment: info   # debug로 바꾸면 저장한 메시지를 한 건씩 출력한다
+
 management:
   endpoints:
     web:
@@ -38,4 +42,7 @@ management:
 
 mes:
   mqtt:
+    enabled: true                               # false면 수집기를 만들지 않는다 (테스트 프로필)
     broker-url: ${MQTT_URL:tcp://localhost:1883}
+    client-id: minimes-server-collector         # 고정 ID: 재접속하면 브로커가 보관해 둔 세션을 이어받는다
+    topic: minimes/equipment/+/data             # + 자리에 설비 코드 (CNC01 ~ CNC05)

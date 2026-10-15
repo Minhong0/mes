@@ -9,3 +9,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop   # 엔티티 구조대로 테이블을 만들고 테스트가 끝나면 지운다
+
+mes:
+  mqtt:
+    enabled: false   # 테스트는 브로커 없이 실행한다. 수집기 로직은 MqttCollectorTest가 직접 부른다

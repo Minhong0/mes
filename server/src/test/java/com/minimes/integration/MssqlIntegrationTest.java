@@ -58,6 +58,7 @@ class MssqlIntegrationTest {
         registry.add("spring.datasource.url", () -> MSSQL.getJdbcUrl() + ";databaseName=minimes");
         registry.add("spring.datasource.username", MSSQL::getUsername);
         registry.add("spring.datasource.password", MSSQL::getPassword);
+        registry.add("mes.mqtt.enabled", () -> "false");   // 이 테스트는 API와 스키마만 본다. 브로커 없이 실행
     }
 
     @Autowired
