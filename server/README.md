@@ -30,6 +30,14 @@ Java 21, Spring Boot 4.0, JPA + MyBatis, MSSQL.
 | DB 저장 실패 | 수신 확인을 보내지 않아 브로커가 다시 보냅니다. |
 | 깨진 JSON, 모르는 설비 | 로그를 남기고 버립니다. |
 
+상태가 바뀌는 메시지(예: RUN → DOWN)가 오면 이력도 함께 남깁니다.
+
+| 테이블 | 언제 | 내용 |
+| --- | --- | --- |
+| `equipment_status_log` | 상태가 바뀔 때마다 | 앞 상태 행을 닫고(`ended_at`) 새 상태 행을 엽니다. `ended_at`이 비어 있는 행이 현재 상태입니다. |
+| `downtime` (`source = 'EQUIP'`) | DOWN·SETUP이 시작될 때 열고, 끝날 때 닫음 | 정지 사유 코드(`dt_cat`, `dt_sub`)와 정지 시간(`duration_min`, 분 단위 반올림) |
+| `equipment.status` | 상태가 바뀔 때마다 | 설비의 현재 상태 |
+
 설정은 `application.yml`의 `mes.mqtt.*`에 있습니다. 테스트 프로필은 `mes.mqtt.enabled: false`로 수집기를 끄고 실행합니다.
 저장 내용을 한 건씩 보려면 `logging.level.com.minimes.equipment`를 `debug`로 바꿉니다.
 
@@ -63,9 +71,9 @@ com.minimes
 │  ├─ service
 │  └─ web
 └─ equipment      설비 데이터 수집
-   ├─ domain      EquipmentData (equipment_data 한 행)
+   ├─ domain      EquipmentData(원본), EquipmentStatusLog(상태 이력), Downtime(비가동)
    ├─ repository
-   ├─ service     EquipmentDataService (중복 확인, 시간대 변환, 저장)
+   ├─ service     EquipmentDataService (중복 확인, 저장), EquipmentStatusService (상태 전환 기록)
    └─ mqtt        MqttCollector (구독, 재접속), EquipmentMessage, MqttProperties
 ```
 

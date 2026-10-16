@@ -49,7 +49,7 @@ public class MqttCollector implements SmartLifecycle, MqttCallbackExtended {
 
     private MqttClient client;
     private Thread connectThread;
-    private volatile boolean running;   // volatile: 다른 스레드(접속 스레드)가 바뀐 값을 바로 보도록
+    private volatile boolean running;   // volatile: 다른 스레드(접속 스레드)가 바뀐 값을 바로 보도록 무조건 메인 메모리에 저장
 
     // ── 시작과 종료: Spring이 모든 빈을 만든 뒤 start(), 종료할 때 stop()을 부른다 (SmartLifecycle) ──
 

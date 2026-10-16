@@ -52,4 +52,9 @@ public class Equipment {
     public boolean isAutoCollect() {
         return "Y".equals(autoCollect);
     }
+
+    /** 현재 상태를 바꾼다. 설비 데이터 수집기가 상태가 바뀔 때 부른다 (공통코드 EQUIP_STATUS 값). */
+    public void changeStatus(String status) {
+        this.status = status;
+    }
 }
