@@ -38,7 +38,8 @@ import java.time.temporal.ChronoUnit;
 @Transactional
 public class EquipmentStatusService {
 
-    static final Duration OFFLINE_GAP = Duration.ofMinutes(30);
+    /** 이보다 오래 소식이 없으면 설비가 꺼졌거나 통신이 끊긴 것으로 본다. 모니터링 화면의 "통신 없음" 판단에도 쓴다. */
+    public static final Duration OFFLINE_GAP = Duration.ofMinutes(30);
 
     private final EquipmentStatusLogRepository statusLogRepository;
     private final EquipmentDataRepository equipmentDataRepository;

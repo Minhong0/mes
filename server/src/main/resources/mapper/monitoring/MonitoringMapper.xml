@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.minimes.monitoring.mapper.MonitoringMapper">
+
+    <!--
+        설비마다 "가장 최근 한 행"을 세 테이블에서 하나씩 가져온다.
+        OUTER APPLY (SELECT TOP 1 ... ORDER BY ... DESC): 바깥 행(설비)마다 안쪽 쿼리를 한 번씩 실행한다.
+          - LEFT JOIN과 비슷하지만, 안쪽 쿼리가 바깥 행의 값(e.equip_code)을 쓸 수 있고 TOP 1로 한 행만 고를 수 있다.
+          - 결과가 없어도 설비 행은 남는다 (OUTER). 예: 가동 중이면 진행 중인 정지가 없어 d.* 가 NULL.
+        equipment_data는 행이 가장 많은 테이블이지만, 인덱스 (equip_code, collected_at) 덕분에
+        설비마다 맨 끝 한 행만 바로 찾아간다.
+    -->
+    <select id="selectEquipmentNow" resultType="com.minimes.monitoring.mapper.EquipmentNow">
+        SELECT
+            e.equip_code,
+            e.equip_name,
+            e.status,
+            st.code_name   AS status_name,
+            s.started_at   AS status_since,
+            d.dt_cat,
+            cat.code_name  AS dt_cat_name,
+            d.dt_sub,
+            sub.code_name  AS dt_sub_name,
+            d.started_at   AS stop_started_at,
+            last.collected_at AS last_seen_at,
+            last.cycle_count,
+            last.spindle_vibration,
+            last.spindle_temp
+        FROM equipment e
+        OUTER APPLY (
+            SELECT TOP 1 started_at
+            FROM equipment_status_log
+            WHERE equip_code = e.equip_code AND ended_at IS NULL
+            ORDER BY started_at DESC
+        ) s
+        OUTER APPLY (
+            SELECT TOP 1 dt_cat, dt_sub, started_at
+            FROM downtime
+            WHERE equip_code = e.equip_code AND source = 'EQUIP' AND ended_at IS NULL
+            ORDER BY started_at DESC
+        ) d
+        OUTER APPLY (
+            SELECT TOP 1 collected_at, cycle_count, spindle_vibration, spindle_temp
+            FROM equipment_data
+            WHERE equip_code = e.equip_code
+            ORDER BY collected_at DESC
+        ) last
+        LEFT JOIN common_code st  ON st.group_code = 'EQUIP_STATUS' AND st.code = e.status
+        LEFT JOIN common_code cat ON cat.group_code = 'DT_CAT' AND cat.code = d.dt_cat
+        LEFT JOIN common_code sub ON sub.group_code = 'DT_SUB' AND sub.code = d.dt_sub
+        WHERE e.auto_collect = 'Y'
+        ORDER BY e.equip_code
+    </select>
+
+</mapper>

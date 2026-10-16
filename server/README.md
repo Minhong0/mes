@@ -16,6 +16,15 @@ Java 21, Spring Boot 4.0, JPA + MyBatis, MSSQL.
 3. http://localhost:8080/swagger-ui.html 에서 API를 확인하고 직접 호출해 볼 수 있습니다.
 4. 설비 시뮬레이터(`simulator/MiniMes.Simulator`에서 `dotnet run`)를 실행하면, 서버의 MQTT 수집기가 메시지를 받아 `equipment_data`에 저장합니다.
 
+## 모니터링 화면
+
+http://localhost:8080/monitoring 에서 CNC01~05의 현재 상태, 진행 중인 정지 사유, 마지막 센서값, 오늘 OEE를 실시간으로 보여 줍니다.
+
+- 화면(`templates/monitoring.html`)은 빈 틀이고, `static/js/monitoring.js`가 데이터를 받아 카드를 그립니다. 화면 기술을 바꿔도 API는 그대로 씁니다.
+- 실시간: 화면이 WebSocket(STOMP) `/ws`에 접속해 `/topic/dashboard`를 구독합니다. 설비 메시지가 저장되거나 집계가 끝나면 서버가 1초 안에 대시보드를 보냅니다 (`DashboardPusher`, 바뀐 것이 없으면 보내지 않음).
+- 연결이 끊기면 화면 오른쪽 위가 "연결 끊김"으로 바뀌고, 다시 접속될 때까지 `GET /api/monitoring/dashboard`를 5초마다 조회합니다.
+- "지금"과 "오늘"은 공장 시계(설비가 보낸 가장 늦은 측정 시각) 기준입니다. 30분 넘게 소식이 없는 설비는 "통신 없음"으로 표시합니다.
+
 ## 일별 생산 실적과 OEE
 
 수집 데이터로 `production_daily`(source `MES`)를 만들면, 기존 OEE 뷰(`v_oee_daily`, `v_oee_monthly`)가 부트캠프 실적과 같은 식으로 계산합니다.
@@ -74,7 +83,7 @@ IntelliJ에서는 테스트 클래스 옆의 ▶ 버튼으로 하나씩 실행�
 ```
 com.minimes
 ├─ common
-│  ├─ config      Clock 등 공통 설정
+│  ├─ config      Clock, 스케줄러, WebSocket(STOMP) 공통 설정
 │  └─ error       ErrorCode, BusinessException, 공통 오류 응답, 전역 예외 처리
 ├─ master         기준정보 (조회)
 │  ├─ domain      엔티티: Item, Routing, Equipment, CommonCode ...
@@ -93,6 +102,11 @@ com.minimes
 │  ├─ mapper      OeeMapper (v_oee_daily, v_oee_monthly) → resources/mapper/production/OeeMapper.xml
 │  ├─ service     ProductionAggregationService (집계), ProductionAggregationScheduler (1분마다)
 │  └─ web         OeeController
+├─ monitoring     설비 현황 대시보드
+│  ├─ push        DashboardPusher (저장·집계 이벤트 → 1초마다 /topic/dashboard로 전송)
+│  ├─ mapper      MonitoringMapper (설비별 최신 상태, OUTER APPLY) → resources/mapper/monitoring/
+│  ├─ service     MonitoringService (공장 시계 기준 판단), Dashboard (응답)
+│  └─ web         MonitoringController (/api/monitoring), MonitoringPageController (/monitoring 화면)
 └─ equipment      설비 데이터 수집
    ├─ domain      EquipmentData(원본), EquipmentStatusLog(상태 이력), Downtime(비가동)
    ├─ repository
@@ -116,9 +130,11 @@ com.minimes
 | POST | `/api/work-orders/{woNo}/start` | 시작 (대기 → 진행) |
 | POST | `/api/work-orders/{woNo}/complete` | 완료 (진행 → 완료) |
 | POST | `/api/work-orders/{woNo}/close` | 마감 (완료 → 마감) |
+| GET | `/api/monitoring/dashboard` | 설비 현황 (현재 상태, 정지 사유, 센서값, 오늘 OEE) |
 | GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
 | GET | `/api/oee/monthly?month=2025-10` | 설비별 월별 OEE (시간·수량 합산 후 계산) |
 | POST | `/api/production-daily/aggregate?date=2026-10-17` | 그날 집계 다시 하기 |
+| WebSocket | `/ws` → 구독 `/topic/dashboard` | 대시보드 실시간 수신 (STOMP, 본문은 `/api/monitoring/dashboard`와 같음) |
 
 오류 응답은 항상 같은 형식입니다.
 

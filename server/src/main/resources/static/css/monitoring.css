@@ -1,0 +1,116 @@
+/* 설비 현황 대시보드. 상태 색은 카드 왼쪽 띠와 배지에만 써서, 여러 대가 한눈에 구분되게 한다. */
+:root {
+    --bg: #f4f5f7;
+    --card: #ffffff;
+    --text: #1d2330;
+    --muted: #6b7280;
+    --line: #e3e6eb;
+    --run: #1f9d55;
+    --setup: #d9930d;
+    --down: #d64545;
+    --idle: #8a94a6;
+    --offline: #b0b7c3;
+    --accent: #2f6fdf;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+}
+
+.top {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.top h1 { margin: 0; font-size: 24px; }
+.sub, .refresh, .note { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.note { margin-top: 16px; }
+
+/* 연결 상태: 앞의 점 색으로 실시간인지 조회로 대체 중인지 보인다 */
+.connection::before {
+    content: "";
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+    background: var(--idle);
+}
+.connection.live::before { background: var(--run); }
+.connection.lost::before { background: var(--setup); }
+
+.error {
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #fdecec;
+    color: var(--down);
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));   /* 1280px 화면이면 5대가 한 줄, 좁은 화면이면 화면 폭에 맞춘 1열 */
+    gap: 16px;
+}
+
+.card {
+    padding: 16px;
+    border-radius: 10px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 6px solid var(--state);
+}
+.card.run { --state: var(--run); }
+.card.setup { --state: var(--setup); }
+.card.down { --state: var(--down); }
+.card.idle { --state: var(--idle); }
+.card.offline { --state: var(--offline); color: var(--muted); }
+
+.card-head { display: flex; justify-content: space-between; align-items: center; }
+.name strong { font-size: 18px; margin-right: 6px; }
+.name span { color: var(--muted); font-size: 13px; }
+.badge {
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--state);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.status-line { margin: 10px 0; font-size: 14px; min-height: 20px; }
+
+/* 센서값과 OEE 세 지표는 같은 3칸 표 모양: 위에 이름, 아래에 값 */
+.sensors, .oee-parts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+}
+.sensors {
+    margin: 0 0 12px;
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+}
+.oee-parts { margin: 8px 0 4px; }
+.sensors dt, .oee-parts dt { color: var(--muted); font-size: 12px; }
+.sensors dd, .oee-parts dd {
+    margin: 2px 0 0;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;   /* 숫자 폭을 같게: 값이 바뀌어도 글자가 흔들리지 않는다 */
+    white-space: nowrap;                  /* "1.42 mm/s"가 두 줄로 갈라지지 않게 */
+}
+
+.oee-head { display: flex; justify-content: space-between; align-items: baseline; }
+.oee-head strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.bar { height: 8px; margin: 6px 0; border-radius: 4px; background: var(--line); overflow: hidden; }
+.bar-fill { height: 100%; background: var(--accent); }
+.muted { margin: 2px 0; color: var(--muted); font-size: 13px; }

@@ -13,6 +13,7 @@ import com.minimes.production.domain.ProductionSource;
 import com.minimes.production.repository.ProductionDailyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +44,7 @@ public class ProductionAggregationService {
     private final EquipmentDataRepository equipmentDataRepository;
     private final EquipmentStatusLogRepository statusLogRepository;
     private final ProductionDailyRepository productionDailyRepository;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     /** since 이후에 받은 데이터가 걸쳐 있는 날짜들 (측정 시각 기준). 받은 것이 없으면 빈 목록. */
@@ -66,6 +68,9 @@ public class ProductionAggregationService {
             if (equipment.isAutoCollect() && aggregate(date, equipment)) {
                 saved++;
             }
+        }
+        if (saved > 0) {
+            eventPublisher.publishEvent(new ProductionAggregatedEvent(date));
         }
         return saved;
     }

@@ -7,6 +7,7 @@ import com.minimes.equipment.repository.EquipmentDataRepository;
 import com.minimes.master.repository.EquipmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,6 +22,8 @@ import java.time.LocalDateTime;
  * 새 메시지를 저장한 뒤에는 상태 이력·비가동 기록도 갱신한다 (EquipmentStatusService). 같은 트랜잭션이라
  * 둘 중 하나가 실패하면 원본 저장도 취소되고, 브로커가 다시 보낸 메시지로 처음부터 다시 처리한다.
  * 중복 메시지는 여기서 걸러지므로 상태 이력이 두 번 바뀌는 일도 없다.
+ *
+ * 저장이 끝나면 EquipmentDataSavedEvent를 알린다. 이 서비스는 누가 그 소식을 듣는지(모니터링 화면 push 등) 모른다.
  */
 @Slf4j
 @Service
@@ -31,6 +34,7 @@ public class EquipmentDataService {
     private final EquipmentDataRepository equipmentDataRepository;
     private final EquipmentRepository equipmentRepository;
     private final EquipmentStatusService equipmentStatusService;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     public SaveResult save(EquipmentMessage message) {
@@ -60,6 +64,7 @@ public class EquipmentDataService {
             equipmentStatusService.apply(message.equipCode(), status,
                     message.downtimeCategory(), message.downtimeReason(), collectedAt);
         }
+        eventPublisher.publishEvent(new EquipmentDataSavedEvent(message.equipCode()));
         return SaveResult.SAVED;
     }
 
