@@ -31,8 +31,16 @@ using var buffer = new MessageBuffer(bufferPath);
 Console.WriteLine($"로컬 버퍼: {bufferPath} (이전 실행에서 못 보낸 메시지 {buffer.Count()}건)");
 await using var publisher = new MqttPublisher(BrokerHost, BrokerPort, buffer);
 
-// 3) 설비마다 작업(Task)을 하나씩 시작하고, 모두 끝날 때까지 기다린다
-var clock = new SimulationClock(speed);
+// 3) 공장 시계의 시작 시각: 지금과 지난 실행의 마지막 공장 시각 중 늦은 쪽.
+//    배속으로 돌리면 공장 시계가 현실보다 앞서 가므로, 다시 실행할 때 현실 시각으로 돌아가면 시간이 거꾸로 흐르게 된다.
+var now = DateTimeOffset.Now;
+var lastSimTime = buffer.LoadSimTime();
+var startAt = lastSimTime > now ? lastSimTime.Value : now;   // null과 비교하면 false라서 처음 실행이면 now
+startAt = startAt.AddTicks(-(startAt.Ticks % TimeSpan.TicksPerSecond));   // 초 아래는 버린다
+Console.WriteLine($"공장 시계 시작: {startAt:yyyy-MM-dd HH:mm:ss}" + (lastSimTime > now ? " (지난 실행에서 이어서)" : ""));
+
+// 4) 설비마다 작업(Task)을 하나씩 시작하고, 모두 끝날 때까지 기다린다
+var clock = new SimulationClock(speed, startAt);
 var runId = DateTimeOffset.Now.ToString("yyMMddHHmmss");   // 실행마다 다른 값: 재시작해도 messageId가 겹치지 않게
 var tasks = specs
     .Select((spec, index) => new SimulatedEquipment(spec, history, publisher, clock, runId, seed: Environment.TickCount + index))

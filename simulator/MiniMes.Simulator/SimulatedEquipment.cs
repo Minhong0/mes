@@ -17,6 +17,10 @@ public sealed class SimulatedEquipment
     // 고장 징후가 나타나기 시작하는 시점: 정지 몇 분 전부터 (시뮬레이션 분)
     private const double WarningWindowMinutes = 180;
 
+    // 정지 중에도 이 간격(시뮬레이션 분)마다 상태를 보낸다 (heartbeat). 실제 설비도 멈춰 있는 동안 상태를 계속 알린다.
+    // 서버는 30분 넘게 소식이 없으면 설비가 꺼졌거나 통신이 끊긴 것으로 본다. 가동 중에는 사이클(최대 약 21분)마다 보내므로 괜찮다.
+    private const double HeartbeatMinutes = 10;
+
     private readonly EquipmentSpec _spec;
     private readonly IReadOnlyList<DowntimeEvent> _history;
     private readonly double _meanMinutesBetweenStops;
@@ -106,7 +110,16 @@ public sealed class SimulatedEquipment
         _status = stop.Category == "SETUP" ? "SETUP" : "DOWN";   // 셋업은 계획된 정지라 고장과 구분한다
         Publish();
 
-        _simNow += stop.DurationMinutes;
+        var endAt = _simNow + stop.DurationMinutes;
+        while (_simNow + HeartbeatMinutes < endAt)
+        {
+            _simNow += HeartbeatMinutes;
+            await _clock.WaitUntil(_simNow, ct);
+            ct.ThrowIfCancellationRequested();
+            Publish();   // 같은 상태(DOWN/SETUP)와 사유를 다시 보낸다. 서버는 상태가 그대로라 이력을 바꾸지 않는다
+        }
+
+        _simNow = endAt;
         await _clock.WaitUntil(_simNow, ct);
         ct.ThrowIfCancellationRequested();
 
@@ -133,10 +146,11 @@ public sealed class SimulatedEquipment
     {
         _sequence++;
         var (vibration, temp) = ReadSensors();
+        var collectedAt = _clock.At(_simNow);   // 현실 시각이 아니라 공장 시계: 사건이 일어나기로 정해진 시뮬레이션 시각
         var message = new EquipmentMessage(
             MessageId: $"{_spec.EquipCode}-{_runId}-{_sequence:D6}",
             EquipCode: _spec.EquipCode,
-            CollectedAt: DateTimeOffset.Now,
+            CollectedAt: collectedAt,
             CycleCount: _cycleCount,
             Status: _status,
             SpindleVibration: vibration,
@@ -147,7 +161,7 @@ public sealed class SimulatedEquipment
         _publisher.Enqueue(message);   // 버퍼에 적기만 한다. 실제 전송은 MqttPublisher가 따로 한다
 
         var reason = _currentStop == null ? "" : $"  사유 {_currentStop.Reason} {_currentStop.DurationMinutes}분";
-        Console.WriteLine($"[{_spec.EquipCode}] {_status,-5} 누적 {_cycleCount,3}개  진동 {vibration,4} mm/s  온도 {temp} °C{reason}");
+        Console.WriteLine($"{collectedAt:MM-dd HH:mm} [{_spec.EquipCode}] {_status,-5} 누적 {_cycleCount,3}개  진동 {vibration,4} mm/s  온도 {temp} °C{reason}");
     }
 
     /// <summary>

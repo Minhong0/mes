@@ -30,6 +30,13 @@ public sealed class MessageBuffer : IDisposable
                 created_at TEXT NOT NULL
             )
             """);
+        // 공장 시계를 기억하는 칸. 다시 실행해도 시각이 뒤로 가지 않게 마지막 시뮬레이션 시각을 남긴다.
+        Execute("""
+            CREATE TABLE IF NOT EXISTS sim_clock (
+                id        INTEGER PRIMARY KEY CHECK (id = 1),   -- 행은 항상 하나
+                last_unix INTEGER NOT NULL                      -- 마지막 공장 시각 (유닉스 시간, 밀리초)
+            )
+            """);
     }
 
     public void Add(string topic, string payload)
@@ -67,6 +74,34 @@ public sealed class MessageBuffer : IDisposable
             command.CommandText = "DELETE FROM outbox WHERE id = $id";
             command.Parameters.AddWithValue("$id", id);
             command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>공장 시각을 기록한다. 이미 더 늦은 시각이 있으면 그대로 둔다 (설비 5대가 조금씩 다른 시각을 보내므로).</summary>
+    public void SaveSimTime(DateTimeOffset at)
+    {
+        lock (_lock)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = """
+                INSERT INTO sim_clock (id, last_unix) VALUES (1, $unix)
+                ON CONFLICT (id) DO UPDATE SET last_unix = MAX(last_unix, excluded.last_unix)
+                """;
+            command.Parameters.AddWithValue("$unix", at.ToUnixTimeMilliseconds());
+            command.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>지난 실행의 마지막 공장 시각. 처음 실행이면 null.</summary>
+    public DateTimeOffset? LoadSimTime()
+    {
+        lock (_lock)
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = "SELECT last_unix FROM sim_clock WHERE id = 1";
+            return command.ExecuteScalar() is long unix
+                ? DateTimeOffset.FromUnixTimeMilliseconds(unix).ToLocalTime()
+                : null;
         }
     }
 

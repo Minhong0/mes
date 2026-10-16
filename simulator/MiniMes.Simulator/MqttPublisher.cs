@@ -48,6 +48,7 @@ public sealed class MqttPublisher : IAsyncDisposable
     public void Enqueue(EquipmentMessage message)
     {
         _buffer.Add($"minimes/equipment/{message.EquipCode}/data", JsonSerializer.Serialize(message, JsonOptions));
+        _buffer.SaveSimTime(message.CollectedAt);
         _newMessage.Release();   // 쉬고 있는 보내는 쪽을 깨운다
     }
 
