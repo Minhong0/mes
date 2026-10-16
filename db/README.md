@@ -4,6 +4,7 @@
 | --- | --- |
 | `ddl/` | 테이블과 뷰 생성 스크립트. 파일 번호 순서대로 실행합니다. |
 | `seed/` | 초기 데이터 (기준정보, 부트캠프 과거 실적). `tools/`의 스크립트로 생성합니다. |
+| `scripts/` | 운영 보조 스크립트. `reset_collected.sql`: 시뮬레이터·수집기가 만든 데이터만 지웁니다. |
 
 ERD와 설계 이유는 [docs/erd.md](../docs/erd.md)에 있습니다.
 
@@ -44,3 +45,16 @@ done
 | `seed/02_history.sql` | 부트캠프 2025년 10월 실적 (일별 실적 115, 비가동 220) | 가능 (기존 BOOTCAMP 데이터를 지우고 다시 넣음) |
 
 seed 파일은 자동 생성 파일이므로 직접 고치지 말고, CSV나 스크립트를 고친 뒤 다시 생성합니다.
+
+## 수집 데이터 초기화
+
+시뮬레이터로 쌓은 데이터(`equipment_data`, 상태 이력, `EQUIP` 비가동, `MES` 생산 실적)만 지웁니다. 기준정보와 부트캠프 실적은 남습니다. 서버를 끈 뒤 실행합니다.
+
+```bash
+source .env
+export MSYS_NO_PATHCONV=1
+docker cp db/scripts/reset_collected.sql minimes-mssql:/tmp/
+docker exec minimes-mssql /opt/mssql-tools18/bin/sqlcmd   -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -I -b -f 65001 -i /tmp/reset_collected.sql
+```
+
+공장 시계도 처음부터 다시 시작하려면 시뮬레이터 실행 폴더의 `outbox.db`도 지웁니다 (못 보낸 메시지가 없을 때).

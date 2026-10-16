@@ -95,6 +95,9 @@ class EquipmentStatusServiceTest {
         equipmentDataService.save(run("09:00:00"));
         equipmentDataService.save(run("09:12:00"));
         equipmentDataService.save(message("09:24:00", "DOWN", "BREAKDOWN", "BRK_SPINDLE"));
+        equipmentDataService.save(message("09:34:00", "DOWN", "BREAKDOWN", "BRK_SPINDLE"));   // 정지 중 heartbeat (10분마다)
+        equipmentDataService.save(message("09:44:00", "DOWN", "BREAKDOWN", "BRK_SPINDLE"));
+        equipmentDataService.save(message("09:54:00", "DOWN", "BREAKDOWN", "BRK_SPINDLE"));
         equipmentDataService.save(run("10:00:00"));
         equipmentDataService.save(run("10:12:00"));
 
@@ -114,7 +117,36 @@ class EquipmentStatusServiceTest {
                 });
 
         assertThat(equipmentRepository.findById("CNC01").orElseThrow().getStatus()).isEqualTo("RUN");
-        assertThat(equipmentDataRepository.count()).isEqualTo(5);   // 원본은 메시지 수만큼 그대로
+        assertThat(equipmentDataRepository.count()).isEqualTo(8);   // 원본은 메시지 수만큼 그대로
+    }
+
+    @Test
+    @DisplayName("30분 넘게 소식이 없다가 오면, 직전 메시지 시각에 닫고 새로 연다 (그 사이는 기록하지 않음)")
+    void offlineGap() {
+        equipmentDataService.save(run("09:00:00"));
+        equipmentDataService.save(run("09:12:00"));
+        equipmentDataService.save(message("09:20:00", "DOWN", "MATERIAL", "MAT_NOT_RECEIVED"));
+        // 시뮬레이터가 꺼졌다가 11:00에 다시 켜짐 (09:20 이후 소식 없음)
+        equipmentDataService.save(run("11:00:00"));
+
+        assertThat(logs()).extracting(EquipmentStatusLog::getStatus, EquipmentStatusLog::getStartedAt, EquipmentStatusLog::getEndedAt)
+                .containsExactly(
+                        tuple(EquipmentStatus.RUN, at("09:00:00"), at("09:20:00")),
+                        tuple(EquipmentStatus.DOWN, at("09:20:00"), at("09:20:00")),   // 마지막 소식에서 닫힘
+                        tuple(EquipmentStatus.RUN, at("11:00:00"), null));
+        assertThat(downtimeRepository.findByEquipCodeAndSourceOrderByStartedAt("CNC01", DowntimeSource.EQUIP))
+                .extracting(Downtime::getDurationMin).containsExactly(0);   // 꺼져 있던 1시간 40분은 정지로 세지 않는다
+    }
+
+    @Test
+    @DisplayName("소식이 끊겼다 와도 상태가 같으면(RUN → RUN) 이력을 나눈다")
+    void offlineGapSameStatus() {
+        equipmentDataService.save(run("09:00:00"));
+        equipmentDataService.save(run("09:12:00"));
+        equipmentDataService.save(run("10:00:00"));   // 48분 공백
+
+        assertThat(logs()).extracting(EquipmentStatusLog::getStartedAt, EquipmentStatusLog::getEndedAt)
+                .containsExactly(tuple(at("09:00:00"), at("09:12:00")), tuple(at("10:00:00"), null));
     }
 
     @Test

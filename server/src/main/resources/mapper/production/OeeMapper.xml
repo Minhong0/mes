@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.minimes.production.mapper.OeeMapper">
+
+    <!-- 일별 OEE: 비율은 뷰에서, 근거 숫자(계획·가동 시간, 수량)는 production_daily에서 가져온다 -->
+    <select id="selectDaily" resultType="com.minimes.production.mapper.OeeDaily">
+        SELECT
+            p.prod_date,
+            p.equip_code,
+            p.source,
+            p.planned_min,
+            p.downtime_min,
+            p.run_min,
+            p.prod_qty,
+            p.good_qty,
+            p.ideal_ct_min,
+            v.availability,
+            v.performance,
+            v.quality,
+            v.oee
+        FROM production_daily p
+        JOIN v_oee_daily v ON v.prod_date = p.prod_date AND v.equip_code = p.equip_code
+        WHERE p.prod_date = #{prodDate}
+        ORDER BY p.equip_code
+    </select>
+
+    <select id="selectMonthly" resultType="com.minimes.production.mapper.OeeMonthly">
+        SELECT prod_month, equip_code, source, availability, performance, quality, oee
+        FROM v_oee_monthly
+        WHERE prod_month = #{month}
+        ORDER BY equip_code, source
+    </select>
+
+</mapper>

@@ -16,6 +16,21 @@ Java 21, Spring Boot 4.0, JPA + MyBatis, MSSQL.
 3. http://localhost:8080/swagger-ui.html 에서 API를 확인하고 직접 호출해 볼 수 있습니다.
 4. 설비 시뮬레이터(`simulator/MiniMes.Simulator`에서 `dotnet run`)를 실행하면, 서버의 MQTT 수집기가 메시지를 받아 `equipment_data`에 저장합니다.
 
+## 일별 생산 실적과 OEE
+
+수집 데이터로 `production_daily`(source `MES`)를 만들면, 기존 OEE 뷰(`v_oee_daily`, `v_oee_monthly`)가 부트캠프 실적과 같은 식으로 계산합니다.
+
+| 항목 | 계산 |
+| --- | --- |
+| 생산 수량 | 그날 메시지의 누적 카운트(`cycleCount`)가 늘어난 양의 합. 카운트가 줄면(시뮬레이터 재시작) 새 값을 더함 |
+| 계획 시간 | 그날 상태 이력이 덮는 시간 (설비 데이터가 있었던 시간) |
+| 비가동 시간 | 그중 DOWN, SETUP 시간 |
+| 양품·불량 | 아직 입력하는 곳이 없어 모두 양품 (POP 검사 입력 예정) |
+
+- `ProductionAggregationScheduler`가 1분마다, 새 데이터가 들어온 날짜만 다시 집계합니다 (`mes.aggregation.*`).
+- 부트캠프 실적이 있는 날짜는 덮어쓰지 않습니다.
+- 시각은 모두 공장 시계(시뮬레이터가 보낸 측정 시각) 기준입니다. 600배속이면 현실 1분에 공장 시계 10시간이 흐릅니다.
+
 ## 설비 데이터 수집 (MQTT)
 
 ```
@@ -37,6 +52,8 @@ Java 21, Spring Boot 4.0, JPA + MyBatis, MSSQL.
 | `equipment_status_log` | 상태가 바뀔 때마다 | 앞 상태 행을 닫고(`ended_at`) 새 상태 행을 엽니다. `ended_at`이 비어 있는 행이 현재 상태입니다. |
 | `downtime` (`source = 'EQUIP'`) | DOWN·SETUP이 시작될 때 열고, 끝날 때 닫음 | 정지 사유 코드(`dt_cat`, `dt_sub`)와 정지 시간(`duration_min`, 분 단위 반올림) |
 | `equipment.status` | 상태가 바뀔 때마다 | 설비의 현재 상태 |
+
+30분 넘게 소식이 없던 설비에서 메시지가 오면(시뮬레이터를 껐다 켬, 통신 끊김), 그 사이는 어떤 상태로도 기록하지 않습니다. 시뮬레이터는 정지 중에도 10분마다 상태를 보냅니다.
 
 설정은 `application.yml`의 `mes.mqtt.*`에 있습니다. 테스트 프로필은 `mes.mqtt.enabled: false`로 수집기를 끄고 실행합니다.
 저장 내용을 한 건씩 보려면 `logging.level.com.minimes.equipment`를 `debug`로 바꿉니다.
@@ -70,6 +87,12 @@ com.minimes
 │  ├─ repository
 │  ├─ service
 │  └─ web
+├─ production     일별 생산 실적 집계, OEE 조회
+│  ├─ domain      ProductionDaily (production_daily, 복합키)
+│  ├─ repository
+│  ├─ mapper      OeeMapper (v_oee_daily, v_oee_monthly) → resources/mapper/production/OeeMapper.xml
+│  ├─ service     ProductionAggregationService (집계), ProductionAggregationScheduler (1분마다)
+│  └─ web         OeeController
 └─ equipment      설비 데이터 수집
    ├─ domain      EquipmentData(원본), EquipmentStatusLog(상태 이력), Downtime(비가동)
    ├─ repository
@@ -93,6 +116,9 @@ com.minimes
 | POST | `/api/work-orders/{woNo}/start` | 시작 (대기 → 진행) |
 | POST | `/api/work-orders/{woNo}/complete` | 완료 (진행 → 완료) |
 | POST | `/api/work-orders/{woNo}/close` | 마감 (완료 → 마감) |
+| GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
+| GET | `/api/oee/monthly?month=2025-10` | 설비별 월별 OEE (시간·수량 합산 후 계산) |
+| POST | `/api/production-daily/aggregate?date=2026-10-17` | 그날 집계 다시 하기 |
 
 오류 응답은 항상 같은 형식입니다.
 

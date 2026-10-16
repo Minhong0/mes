@@ -1,0 +1,173 @@
+package com.minimes.production.service;
+
+import com.minimes.equipment.domain.EquipmentData;
+import com.minimes.equipment.domain.EquipmentStatusLog;
+import com.minimes.equipment.repository.CollectedRange;
+import com.minimes.equipment.repository.EquipmentDataRepository;
+import com.minimes.equipment.repository.EquipmentStatusLogRepository;
+import com.minimes.master.domain.Equipment;
+import com.minimes.master.repository.EquipmentRepository;
+import com.minimes.production.domain.ProductionDaily;
+import com.minimes.production.domain.ProductionDailyId;
+import com.minimes.production.domain.ProductionSource;
+import com.minimes.production.repository.ProductionDailyRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Clock;
+import java.time.Duration;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+
+/**
+ * 설비 수집 데이터로 일별 생산 실적(production_daily, source = MES)을 만든다.
+ *
+ *   생산 수량   = 그날 메시지의 누적 카운트(cycleCount)가 늘어난 양의 합
+ *   계획 시간   = 그날 상태 이력이 덮는 시간 (설비 데이터가 있었던 시간)
+ *   비가동 시간 = 그중 DOWN, SETUP 상태였던 시간
+ *
+ * 같은 날을 몇 번 다시 집계해도 결과가 같다(멱등). 그래서 늦게 도착한 데이터가 있으면 그날을 다시 집계하면 된다.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class ProductionAggregationService {
+
+    private final EquipmentRepository equipmentRepository;
+    private final EquipmentDataRepository equipmentDataRepository;
+    private final EquipmentStatusLogRepository statusLogRepository;
+    private final ProductionDailyRepository productionDailyRepository;
+    private final Clock clock;
+
+    /** since 이후에 받은 데이터가 걸쳐 있는 날짜들 (측정 시각 기준). 받은 것이 없으면 빈 목록. */
+    @Transactional(readOnly = true)
+    public List<LocalDate> datesReceivedSince(LocalDateTime since) {
+        CollectedRange range = equipmentDataRepository.findCollectedRangeReceivedSince(since);
+        if (range.isEmpty()) {
+            return List.of();
+        }
+        List<LocalDate> dates = new ArrayList<>();
+        for (LocalDate d = range.from().toLocalDate(); !d.isAfter(range.to().toLocalDate()); d = d.plusDays(1)) {
+            dates.add(d);
+        }
+        return dates;
+    }
+
+    /** 하루치를 자동 수집 설비(CNC01~05)마다 집계해 저장한다. 저장한 행 수를 돌려준다. */
+    public int aggregate(LocalDate date) {
+        int saved = 0;
+        for (Equipment equipment : equipmentRepository.findAllByOrderByEquipCode()) {
+            if (equipment.isAutoCollect() && aggregate(date, equipment)) {
+                saved++;
+            }
+        }
+        return saved;
+    }
+
+    private boolean aggregate(LocalDate date, Equipment equipment) {
+        String equipCode = equipment.getEquipCode();
+        LocalDateTime from = date.atStartOfDay();
+        LocalDateTime to = from.plusDays(1);
+
+        Optional<ProductionDaily> existing = productionDailyRepository.findById(new ProductionDailyId(date, equipCode));
+        if (existing.isPresent() && existing.get().getSource() != ProductionSource.MES) {
+            return false;   // 부트캠프 과거 실적이 있는 날은 건드리지 않는다
+        }
+
+        TimeTotals time = sumTime(equipCode, from, to);
+        if (time.plannedMin() == 0) {
+            return false;   // 그날 데이터가 없다 (production_daily는 계획 시간이 0보다 커야 한다)
+        }
+        int prodQty = countProduced(equipCode, from, to);
+
+        if (existing.isPresent()) {
+            existing.get().updateFromMes(time.plannedMin(), time.downtimeMin(), prodQty, equipment.getIdealCtMin());
+        } else {
+            productionDailyRepository.save(ProductionDaily.ofMes(date, equipCode, time.plannedMin(), time.downtimeMin(),
+                    prodQty, equipment.getIdealCtMin(), LocalDateTime.now(clock)));
+        }
+        log.debug("[집계] {} {} 계획 {}분, 비가동 {}분, 생산 {}개", date, equipCode, time.plannedMin(), time.downtimeMin(), prodQty);
+        return true;
+    }
+
+    /**
+     * 상태 이력을 하루 구간으로 잘라 시간을 더한다.
+     *
+     *   하루:        |00:00 ──────────────────────────────────────── 24:00|
+     *   상태 이력:   RUN 어제 22:00 ~ 01:00 | DOWN 01:00 ~ 01:30 | RUN 01:30 ~ (진행 중)
+     *   더하는 부분:     00:00 ~ 01:00        01:00 ~ 01:30        01:30 ~ 마지막 메시지 시각
+     *
+     * 진행 중인 상태는 "마지막 메시지 시각"까지만 센다. 공장 시계는 시뮬레이터가 정하므로 서버의 현재 시각을 쓰면 안 된다.
+     * 초 단위로 더한 뒤 마지막에 분으로 반올림한다 (행마다 반올림하면 오차가 쌓인다).
+     */
+    private TimeTotals sumTime(String equipCode, LocalDateTime from, LocalDateTime to) {
+        List<EquipmentStatusLog> logs = statusLogRepository.findOverlapping(equipCode, from, to);
+        if (logs.isEmpty()) {
+            return new TimeTotals(0, 0);
+        }
+        LocalDateTime lastSeen = equipmentDataRepository.findFirstByEquipCodeOrderByCollectedAtDesc(equipCode)
+                .map(EquipmentData::getCollectedAt)
+                .orElse(from);
+
+        long plannedSeconds = 0;
+        long stoppedSeconds = 0;
+        for (EquipmentStatusLog statusLog : logs) {
+            LocalDateTime start = max(statusLog.getStartedAt(), from);
+            LocalDateTime end = min(statusLog.getEndedAt() != null ? statusLog.getEndedAt() : lastSeen, to);
+            long seconds = Math.max(0, Duration.between(start, end).toSeconds());
+            plannedSeconds += seconds;
+            if (statusLog.getStatus().isStopped()) {
+                stoppedSeconds += seconds;
+            }
+        }
+        return new TimeTotals(toMinutes(plannedSeconds), toMinutes(stoppedSeconds));
+    }
+
+    /**
+     * 그날 가공한 수량. 메시지의 누적 카운트가 늘어난 양을 더한다.
+     *
+     *   전날 마지막 30 → 31, 32, 33 → 0, 1, 2   : 1 + 1 + 1 + 0 + 1 + 1 = 5개
+     *                                ↑ 시뮬레이터 재시작 (카운트가 0부터 다시)
+     *
+     * 카운트가 줄었으면 재시작한 것이므로, 새 카운트 값(재시작 후 만든 개수)을 그대로 더한다.
+     */
+    private int countProduced(String equipCode, LocalDateTime from, LocalDateTime to) {
+        Integer previous = equipmentDataRepository.findFirstByEquipCodeAndCollectedAtLessThanOrderByCollectedAtDesc(equipCode, from)
+                .map(EquipmentData::getCycleCount)
+                .orElse(null);
+        int total = 0;
+        for (EquipmentData data : equipmentDataRepository
+                .findByEquipCodeAndCollectedAtGreaterThanEqualAndCollectedAtLessThanOrderByCollectedAt(equipCode, from, to)) {
+            Integer current = data.getCycleCount();
+            if (current == null) {
+                continue;
+            }
+            if (previous != null) {
+                total += current >= previous ? current - previous : current;
+            }
+            previous = current;
+        }
+        return total;
+    }
+
+    private static int toMinutes(long seconds) {
+        return (int) Math.round(seconds / 60.0);
+    }
+
+    private static LocalDateTime max(LocalDateTime a, LocalDateTime b) {
+        return a.isAfter(b) ? a : b;
+    }
+
+    private static LocalDateTime min(LocalDateTime a, LocalDateTime b) {
+        return a.isBefore(b) ? a : b;
+    }
+
+    private record TimeTotals(int plannedMin, int downtimeMin) {
+    }
+}

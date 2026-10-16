@@ -46,3 +46,7 @@ mes:
     broker-url: ${MQTT_URL:tcp://localhost:1883}
     client-id: minimes-server-collector         # 고정 ID: 재접속하면 브로커가 보관해 둔 세션을 이어받는다
     topic: minimes/equipment/+/data             # + 자리에 설비 코드 (CNC01 ~ CNC05)
+  aggregation:
+    enabled: true          # false면 일별 집계 스케줄러를 만들지 않는다 (테스트 프로필)
+    initial-delay: PT10S   # 서버가 뜨고 10초 뒤 첫 집계 (ISO-8601 기간 표기: PT10S = 10초)
+    interval: PT1M         # 그 뒤로 1분마다 (앞 집계가 끝난 때부터 셈)

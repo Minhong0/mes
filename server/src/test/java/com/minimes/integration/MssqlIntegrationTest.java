@@ -58,7 +58,8 @@ class MssqlIntegrationTest {
         registry.add("spring.datasource.url", () -> MSSQL.getJdbcUrl() + ";databaseName=minimes");
         registry.add("spring.datasource.username", MSSQL::getUsername);
         registry.add("spring.datasource.password", MSSQL::getPassword);
-        registry.add("mes.mqtt.enabled", () -> "false");   // 이 테스트는 API와 스키마만 본다. 브로커 없이 실행
+        registry.add("mes.mqtt.enabled", () -> "false");
+        registry.add("mes.aggregation.enabled", () -> "false");   // 이 테스트는 API와 스키마만 본다. 브로커 없이 실행
     }
 
     @Autowired
@@ -129,5 +130,37 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.status").value("RUN"))
                 .andExpect(jsonPath("$.note").value("통합 테스트"))
                 .andExpect(jsonPath("$.operations[0].woOpId").isNumber());
+    }
+
+    @Test
+    @DisplayName("월별 OEE (뷰 + MyBatis): 부트캠프 2025-10 정답값 CNC01 84.24%, CNC03 59.18%")
+    void monthlyOee() throws Exception {
+        mockMvc.perform(get("/api/oee/monthly").param("month", "2025-10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$[?(@.equipCode == 'CNC01')].oee").value(hasItem(84.24)))
+                .andExpect(jsonPath("$[?(@.equipCode == 'CNC03')].oee").value(hasItem(59.18)))
+                .andExpect(jsonPath("$[?(@.equipCode == 'CNC03')].availability").value(hasItem(76.61)));
+    }
+
+    @Test
+    @DisplayName("일별 OEE: 근거 숫자(계산 컬럼 run_min 포함)와 비율이 함께 나온다")
+    void dailyOee() throws Exception {
+        mockMvc.perform(get("/api/oee/daily").param("date", "2025-10-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$[0].equipCode").value("CNC01"))
+                .andExpect(jsonPath("$[0].source").value("BOOTCAMP"))
+                .andExpect(jsonPath("$[0].oee").value(80.00))
+                .andExpect(jsonPath("$[0].runMin").isNumber());
+    }
+
+    @Test
+    @DisplayName("집계 다시 하기: 부트캠프 실적이 있는 날은 덮어쓰지 않는다")
+    void aggregateKeepsBootcamp() throws Exception {
+        mockMvc.perform(post("/api/production-daily/aggregate").param("date", "2025-10-01"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].source").value("BOOTCAMP"))
+                .andExpect(jsonPath("$[0].oee").value(80.00));
     }
 }

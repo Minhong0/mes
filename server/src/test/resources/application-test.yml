@@ -13,3 +13,5 @@ spring:
 mes:
   mqtt:
     enabled: false   # 테스트는 브로커 없이 실행한다. 수집기 로직은 MqttCollectorTest가 직접 부른다
+  aggregation:
+    enabled: false   # 집계 스케줄러가 테스트 중간에 끼어들지 않게 끈다. 집계는 테스트가 직접 부른다

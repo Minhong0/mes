@@ -4,7 +4,9 @@ import com.minimes.equipment.domain.Downtime;
 import com.minimes.equipment.domain.DowntimeSource;
 import com.minimes.equipment.domain.EquipmentStatus;
 import com.minimes.equipment.domain.EquipmentStatusLog;
+import com.minimes.equipment.domain.EquipmentData;
 import com.minimes.equipment.repository.DowntimeRepository;
+import com.minimes.equipment.repository.EquipmentDataRepository;
 import com.minimes.equipment.repository.EquipmentStatusLogRepository;
 import com.minimes.master.repository.EquipmentRepository;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
@@ -24,6 +27,10 @@ import java.time.temporal.ChronoUnit;
  *   RUN → RUN  : 아무것도 하지 않는다 (대부분의 메시지)
  *
  * 메시지마다 행을 쌓지 않고 "바뀐 순간"만 기록하므로, 상태 이력은 메시지 수보다 훨씬 적다.
+ *
+ * 소식 끊김: 직전 메시지와 OFFLINE_GAP(30분)보다 멀리 떨어진 메시지가 오면, 그 사이에는 설비가 꺼졌거나 통신이
+ * 끊겼던 것으로 본다. 진행 중이던 이력을 직전 메시지 시각에 닫고 새로 연다. 그 사이는 어떤 상태로도 기록하지 않으므로
+ * 일별 집계의 계획 시간에서도 빠진다. (설비는 정지 중에도 10분마다 상태를 보내므로, 정상이면 30분 넘게 비지 않는다)
  */
 @Slf4j
 @Service
@@ -31,7 +38,10 @@ import java.time.temporal.ChronoUnit;
 @Transactional
 public class EquipmentStatusService {
 
+    static final Duration OFFLINE_GAP = Duration.ofMinutes(30);
+
     private final EquipmentStatusLogRepository statusLogRepository;
+    private final EquipmentDataRepository equipmentDataRepository;
     private final DowntimeRepository downtimeRepository;
     private final EquipmentRepository equipmentRepository;
     private final Clock clock;
@@ -52,10 +62,17 @@ public class EquipmentStatusService {
                 log.info("[상태] 늦게 도착한 메시지, 상태 반영 안 함: {} {} {}", equipCode, status, at);
                 return;
             }
-            if (current.getStatus() == status) {
+            LocalDateTime lastSeen = lastSeenBefore(equipCode, collectedAt, current.getStartedAt());
+            if (Duration.between(lastSeen, at).compareTo(OFFLINE_GAP) > 0) {
+                // 소식이 끊겼다 돌아왔다: 마지막으로 소식이 있던 시각에 닫고, 상태가 같아도 새로 연다.
+                log.info("[상태] {} 소식 끊김 {} ~ {}, 그 사이는 기록하지 않음", equipCode, lastSeen, at);
+                current.end(lastSeen);
+                closeOpenDowntime(equipCode, lastSeen);
+            } else if (current.getStatus() == status) {
                 return;   // 상태가 그대로면 할 일이 없다
+            } else {
+                current.end(at);   // 변경 감지: save를 부르지 않아도 커밋할 때 UPDATE 된다
             }
-            current.end(at);   // 변경 감지: save를 부르지 않아도 커밋할 때 UPDATE 된다
         }
 
         statusLogRepository.save(EquipmentStatusLog.start(equipCode, status, at));
@@ -63,8 +80,7 @@ public class EquipmentStatusService {
 
         // 비가동 기록: 진행 중인 정지가 있으면 닫고, 새 상태가 정지면 새로 연다.
         // (DOWN → SETUP처럼 정지끼리 바로 바뀌어도 앞 정지를 닫고 새 정지를 연다)
-        downtimeRepository.findFirstByEquipCodeAndSourceAndEndedAtIsNullOrderByStartedAtDesc(equipCode, DowntimeSource.EQUIP)
-                .ifPresent(open -> open.end(at));
+        closeOpenDowntime(equipCode, at);
         if (status.isStopped()) {
             if (dtCat == null) {
                 log.warn("[상태] 정지 사유가 없는 정지 메시지: {} {} {}", equipCode, status, at);
@@ -73,5 +89,20 @@ public class EquipmentStatusService {
             }
         }
         log.info("[상태] {} {} → {} ({})", equipCode, current == null ? "없음" : current.getStatus(), status, at);
+    }
+
+    private void closeOpenDowntime(String equipCode, LocalDateTime at) {
+        downtimeRepository.findFirstByEquipCodeAndSourceAndEndedAtIsNullOrderByStartedAtDesc(equipCode, DowntimeSource.EQUIP)
+                .ifPresent(open -> open.end(at));
+    }
+
+    /** 이 메시지 직전에 받은 메시지의 측정 시각 (초 단위). 없으면, 또는 지금 상태 시작보다 이르면 지금 상태의 시작 시각. */
+    private LocalDateTime lastSeenBefore(String equipCode, LocalDateTime collectedAt, LocalDateTime currentStartedAt) {
+        LocalDateTime lastSeen = equipmentDataRepository
+                .findFirstByEquipCodeAndCollectedAtLessThanOrderByCollectedAtDesc(equipCode, collectedAt)
+                .map(EquipmentData::getCollectedAt)
+                .map(t -> t.truncatedTo(ChronoUnit.SECONDS))
+                .orElse(currentStartedAt);
+        return lastSeen.isBefore(currentStartedAt) ? currentStartedAt : lastSeen;
     }
 }
