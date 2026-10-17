@@ -114,6 +114,7 @@ erDiagram
     EQUIPMENT ||--o{ DOWNTIME : "비가동"
     EQUIPMENT ||--o{ PRODUCTION_DAILY : "일별 집계"
     EQUIPMENT ||--o{ EQUIPMENT_ALARM : "알람"
+    EQUIPMENT ||--o{ EQUIPMENT_LIMIT : "관리한계"
 
     EQUIPMENT_DATA {
         bigint data_id PK
@@ -142,6 +143,23 @@ erDiagram
         int good_qty
         varchar source "BOOTCAMP, MES"
     }
+    EQUIPMENT_LIMIT {
+        varchar equip_code PK
+        varchar metric PK "VIBRATION, TEMP"
+        decimal center_value "평균"
+        decimal sigma
+        decimal ucl "평균 + 3σ"
+        int sample_count
+    }
+    EQUIPMENT_ALARM {
+        bigint alarm_id PK
+        varchar equip_code FK
+        varchar alarm_type "VIBRATION_UCL, TEMP_UCL, TOOL_LIFE"
+        decimal measured_value
+        decimal limit_value
+        datetime2 occurred_at
+        datetime2 ack_at "NULL이면 확인 전"
+    }
 ```
 
 ## 설계 포인트
@@ -153,5 +171,7 @@ erDiagram
 | `equipment_data.message_id` 유니크 | 시뮬레이터가 통신 장애 뒤 재전송해도 중복 저장되지 않음 |
 | `production_daily`에 부트캠프 실적과 MES 집계를 함께 저장 | OEE를 같은 뷰(`v_oee_daily`, `v_oee_monthly`)로 계산해 엑셀 결과와 비교 |
 | 월별 OEE는 일별 OEE의 평균이 아니라 합산 후 계산 | 부트캠프 2차 자료의 STEP 4 방식과 맞춤 |
+| 관리한계(`equipment_limit`)를 계산 근거(기준 기간, 표본 수)와 함께 저장하고 자동 갱신하지 않음 | 설비가 서서히 나빠지는 중에 한계를 새 데이터로 고치면 한계도 같이 올라가 이상을 놓침 |
+| 확인 전 알람은 설비·종류당 하나 | 고장 징후는 몇 시간 이어지므로 매 메시지 알람이면 담당자가 볼 수 없을 만큼 쌓임 |
 | BOM Level 미저장 | 원본의 Level 번호 오류를 반복하지 않고 재귀 CTE로 계산 |
 | 3단계 기능(자재 재고)은 아직 테이블 없음 | 1~2단계 완성 후 추가 |

@@ -14,4 +14,9 @@ public class MonitoringPageController {
     public String monitoring() {
         return "monitoring";   // templates/monitoring.html
     }
+
+    @GetMapping("/monitoring/pareto")
+    public String pareto() {
+        return "pareto";       // templates/pareto.html
+    }
 }

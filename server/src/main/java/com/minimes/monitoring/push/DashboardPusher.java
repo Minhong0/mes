@@ -1,5 +1,6 @@
 package com.minimes.monitoring.push;
 
+import com.minimes.alarm.service.AlarmAcknowledgedEvent;
 import com.minimes.equipment.service.EquipmentDataSavedEvent;
 import com.minimes.monitoring.service.MonitoringService;
 import com.minimes.production.service.ProductionAggregatedEvent;
@@ -41,6 +42,11 @@ public class DashboardPusher {
 
     @TransactionalEventListener
     public void onAggregated(ProductionAggregatedEvent event) {
+        changed.set(true);
+    }
+
+    @TransactionalEventListener
+    public void onAlarmAcknowledged(AlarmAcknowledgedEvent event) {
         changed.set(true);
     }
 

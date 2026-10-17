@@ -4,6 +4,7 @@
 // 계산(경과 시간, 통신 여부, OEE)은 서버가 끝내 두었으므로, 여기서는 받은 값을 보여 주기만 한다.
 
 const API_URL = document.body.dataset.apiUrl;
+const ALARM_URL = document.body.dataset.alarmUrl;
 const WS_URL = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}${document.body.dataset.wsPath}`;
 const TOPIC = '/topic/dashboard';
 const POLL_MS = 5000;           // 끊긴 동안 직접 조회하는 주기
@@ -11,6 +12,14 @@ const RECONNECT_MS = 5000;      // 끊기면 이 간격으로 다시 접속을 �
 
 // 상태 코드별 화면 표시. 서버가 이름(statusName)도 주지만, 색을 정하려면 코드가 필요하다.
 const STATUS_CLASS = { RUN: 'run', IDLE: 'idle', SETUP: 'setup', DOWN: 'down' };
+
+// 알람 종류별 화면 표시
+const ALARM_LABEL = {
+    VIBRATION_UCL: { name: '진동 관리한계 초과', unit: 'mm/s', digits: 2 },
+    TEMP_UCL: { name: '온도 관리한계 초과', unit: '°C', digits: 1 },
+    TOOL_LIFE: { name: '공구 수명 도달', unit: '', digits: 0 },
+};
+const ACK_BY = 'MONITOR';   // 로그인이 없어서, 이 화면에서 확인한 알람은 확인자를 MONITOR로 남긴다
 
 let pollTimer = null;
 
@@ -83,6 +92,12 @@ function renderCard(eq) {
         el('span', 'badge', eq.online ? (eq.statusName ?? eq.status) : '통신 없음'));
     card.append(head);
 
+    // 경보: 확인 전 알람이 있으면 카드 맨 위에 붙인다
+    if (eq.alarms.length > 0) {
+        card.classList.add('alarmed');
+        eq.alarms.forEach(alarm => card.append(renderAlarm(alarm)));
+    }
+
     // 2) 상태 줄: "정지 42분째 · 설비고장 / 스핀들 이상"
     let statusLine = eq.statusMinutes == null ? '상태 이력 없음' : `${eq.statusName ?? eq.status} ${formatMinutes(eq.statusMinutes)}째`;
     if (eq.stop) {
@@ -103,6 +118,42 @@ function renderCard(eq) {
     // 4) 오늘 OEE: 큰 숫자 + 막대, 그 아래 세 지표와 근거 숫자
     card.append(renderOee(eq.today));
     return card;
+}
+
+function renderAlarm(alarm) {
+    const info = ALARM_LABEL[alarm.alarmType] ?? { name: alarm.alarmType, unit: '', digits: 2 };
+    const value = v => Number(v).toFixed(info.digits);
+    const button = el('button', 'ack', '확인');
+    button.type = 'button';
+    button.addEventListener('click', () => acknowledge(alarm.alarmId, button));
+    return el('div', 'alarm', null, [
+        el('div', null, null, [
+            el('strong', null, info.name),
+            el('span', null, `${value(alarm.measuredValue)} ${info.unit} · UCL ${value(alarm.limitValue)}`),
+            el('span', null, `${formatDateTime(alarm.occurredAt)}부터`),
+        ]),
+        button,
+    ]);
+}
+
+async function acknowledge(alarmId, button) {
+    button.disabled = true;
+    try {
+        const response = await fetch(`${ALARM_URL}/${alarmId}/ack`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ackBy: ACK_BY }),
+        });
+        // 409 = 다른 화면에서 먼저 확인했다. 어느 쪽이든 최신 화면을 다시 받으면 알람이 사라진다
+        if (!response.ok && response.status !== 409) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        refresh();
+    } catch (e) {
+        console.error('알람 확인 실패', e);
+        button.disabled = false;
+        document.getElementById('error').hidden = false;
+    }
 }
 
 function renderOee(today) {

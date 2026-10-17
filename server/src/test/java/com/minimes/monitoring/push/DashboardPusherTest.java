@@ -1,5 +1,6 @@
 package com.minimes.monitoring.push;
 
+import com.minimes.equipment.domain.EquipmentStatus;
 import com.minimes.equipment.service.EquipmentDataSavedEvent;
 import com.minimes.monitoring.service.Dashboard;
 import com.minimes.monitoring.service.MonitoringService;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,6 +42,11 @@ class DashboardPusherTest {
         when(monitoringService.dashboard()).thenReturn(DASHBOARD);
     }
 
+    static EquipmentDataSavedEvent saved(String equipCode) {
+        return new EquipmentDataSavedEvent(equipCode, LocalDateTime.of(2026, 10, 18, 10, 0), EquipmentStatus.RUN,
+                new BigDecimal("1.2"), new BigDecimal("35.0"));
+    }
+
     @Test
     @DisplayName("바뀐 것이 없으면 조회도 전송도 하지 않는다")
     void nothingChanged() {
@@ -52,8 +59,8 @@ class DashboardPusherTest {
     @Test
     @DisplayName("한 주기 안에 여러 건이 저장돼도 한 번만 보낸다")
     void coalesce() {
-        pusher.onDataSaved(new EquipmentDataSavedEvent("CNC01"));
-        pusher.onDataSaved(new EquipmentDataSavedEvent("CNC02"));
+        pusher.onDataSaved(saved("CNC01"));
+        pusher.onDataSaved(saved("CNC02"));
         pusher.onAggregated(new ProductionAggregatedEvent(LocalDate.of(2026, 10, 18)));
 
         pusher.pushIfChanged();
@@ -68,7 +75,7 @@ class DashboardPusherTest {
         doThrow(new IllegalStateException("broker down"))
                 .doNothing()
                 .when(messagingTemplate).convertAndSend(eq(DashboardPusher.TOPIC), any(Object.class));
-        pusher.onDataSaved(new EquipmentDataSavedEvent("CNC01"));
+        pusher.onDataSaved(saved("CNC01"));
 
         pusher.pushIfChanged();   // 실패
         pusher.pushIfChanged();   // 재시도

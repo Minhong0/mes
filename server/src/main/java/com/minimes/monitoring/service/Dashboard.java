@@ -1,5 +1,7 @@
 package com.minimes.monitoring.service;
 
+import com.minimes.monitoring.mapper.OpenAlarm;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -21,6 +23,7 @@ public record Dashboard(LocalDateTime factoryNow, LocalDate prodDate, List<Equip
      * @param statusMinutes 지금 상태가 몇 분째인가
      * @param stop          진행 중인 정지 (가동 중이면 null)
      * @param today         오늘 생산 실적과 OEE (아직 집계 전이면 null)
+     * @param alarms        확인 전 알람 (없으면 빈 목록)
      */
     public record EquipmentCard(
             String equipCode,
@@ -35,7 +38,8 @@ public record Dashboard(LocalDateTime factoryNow, LocalDate prodDate, List<Equip
             BigDecimal spindleVibration,
             BigDecimal spindleTemp,
             LocalDateTime lastSeenAt,
-            TodayOee today
+            TodayOee today,
+            List<OpenAlarm> alarms
     ) {
     }
 

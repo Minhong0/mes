@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>정지 사유 파레토 - Mini-MES</title>
+    <link rel="stylesheet" th:href="@{/css/monitoring.css}">
+    <link rel="stylesheet" th:href="@{/css/pareto.css}">
+</head>
+<body th:data-api-url="@{/api/monitoring/downtime-pareto}">
+<header class="top">
+    <div>
+        <h1>정지 사유 파레토</h1>
+        <p class="sub">정지 시간이 많은 사유부터. 누적 80%까지가 중점 관리 대상입니다.</p>
+    </div>
+    <p class="refresh"><a th:href="@{/monitoring}">← 설비 현황</a></p>
+</header>
+
+<!-- 조건: 바꾸면 바로 다시 조회한다 -->
+<form id="filters" class="filters">
+    <label>시작 <input type="date" name="from"></label>
+    <label>끝 <input type="date" name="to"></label>
+    <label>설비
+        <select name="equipCode">
+            <option value="">전체</option>
+            <option>CNC01</option>
+            <option>CNC02</option>
+            <option>CNC03</option>
+            <option>CNC04</option>
+            <option>CNC05</option>
+        </select>
+    </label>
+    <label>묶음
+        <select name="byReason">
+            <option value="true">사유(소분류)</option>
+            <option value="false">대분류</option>
+        </select>
+    </label>
+    <span class="presets">
+        <button type="button" data-from="2025-10-01" data-to="2025-10-31">2025년 10월 (부트캠프 실적)</button>
+        <button type="button" data-from="" data-to="">최근 30일</button>
+    </span>
+</form>
+
+<p id="error" class="error" hidden>데이터를 받지 못했습니다.</p>
+
+<section class="tiles">
+    <div class="tile"><span>정지 시간</span><strong id="total-min">-</strong></div>
+    <div class="tile"><span>정지 횟수</span><strong id="stop-count">-</strong></div>
+    <div class="tile"><span>중점 관리 대상</span><strong id="vital-few">-</strong></div>
+</section>
+
+<section class="panel">
+    <!-- 두 차트는 x 위치가 같다: 위는 누적 비율(%), 아래는 사유별 정지 시간(분). 단위가 다른 두 값을 한 축에 겹치지 않는다 -->
+    <h2 class="chart-title">누적 비율 <small>— 빨간 점선이 80%</small></h2>
+    <div class="chart-box cumulative"><canvas id="chart-cumulative" aria-label="누적 비율" role="img"></canvas></div>
+    <h2 class="chart-title">사유별 정지 시간 (분)</h2>
+    <div class="legend">
+        <span><i class="swatch vital"></i>누적 80% 안의 사유 (중점 관리 대상)</span>
+        <span><i class="swatch other"></i>나머지</span>
+    </div>
+    <div class="chart-box bars"><canvas id="chart-bars" aria-label="사유별 정지 시간" role="img"></canvas></div>
+    <p id="empty" class="muted" hidden>이 기간에 끝난 정지가 없습니다.</p>
+</section>
+
+<section class="panel">
+    <table class="pareto-table">
+        <thead>
+        <tr><th>#</th><th>대분류</th><th>사유</th><th class="num">횟수</th><th class="num">정지 시간(분)</th><th class="num">비율(%)</th><th class="num">누적(%)</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+    </table>
+</section>
+
+<!-- Chart.js: 막대·선 차트 라이브러리. STOMP와 같이 webjar로 서버에서 받는다 -->
+<script th:src="@{/webjars/chart.js/dist/chart.umd.min.js}"></script>
+<script th:src="@{/js/pareto.js}"></script>
+</body>
+</html>

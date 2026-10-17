@@ -23,6 +23,19 @@ http://localhost:8080/monitoring 에서 CNC01~05의 현재 상태, 진행 중인
 - 화면(`templates/monitoring.html`)은 빈 틀이고, `static/js/monitoring.js`가 데이터를 받아 카드를 그립니다. 화면 기술을 바꿔도 API는 그대로 씁니다.
 - 실시간: 화면이 WebSocket(STOMP) `/ws`에 접속해 `/topic/dashboard`를 구독합니다. 설비 메시지가 저장되거나 집계가 끝나면 서버가 1초 안에 대시보드를 보냅니다 (`DashboardPusher`, 바뀐 것이 없으면 보내지 않음).
 - 연결이 끊기면 화면 오른쪽 위가 "연결 끊김"으로 바뀌고, 다시 접속될 때까지 `GET /api/monitoring/dashboard`를 5초마다 조회합니다.
+- 확인 전 알람이 있는 설비는 카드가 빨갛게 표시되고, [확인]을 누르면 사라집니다.
+
+http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. 기간·설비를 고르면 사유별 정지 시간(막대)과 누적 비율(선)을 보여 주고, 누적 80%까지를 중점 관리 대상으로 표시합니다. 예: `?from=2025-10-01&to=2025-10-31` (부트캠프 실적)
+
+## 진동·온도 관리한계 알람 (CBM)
+
+1. 고장 징후가 없던 기간의 가동 데이터로 관리한계를 정합니다: `POST /api/equipment-limits/calculate?from=2026-10-16&to=2026-10-19`
+   - 설비·항목(진동, 온도)마다 UCL = 평균 + 3σ를 `equipment_limit`에 저장합니다. 표본이 30개 미만인 설비는 건너뜁니다.
+   - 자동으로 다시 계산하지 않습니다. 설비가 나빠지는 중에 한계를 새 데이터로 고치면 한계도 같이 올라가기 때문입니다.
+2. 그 뒤로 가동(RUN) 중 메시지의 값이 UCL을 넘으면 `equipment_alarm`에 남깁니다. 같은 설비·종류의 확인 전 알람이 있으면 새로 만들지 않습니다.
+3. 대시보드의 [확인] 또는 `POST /api/alarms/{alarmId}/ack`로 확인합니다.
+
+이미 만든 DB에는 `db/ddl/06_equipment_limit.sql`을 한 번 실행해야 합니다 (없을 때만 테이블을 만듭니다).
 - "지금"과 "오늘"은 공장 시계(설비가 보낸 가장 늦은 측정 시각) 기준입니다. 30분 넘게 소식이 없는 설비는 "통신 없음"으로 표시합니다.
 
 ## 일별 생산 실적과 OEE
@@ -102,11 +115,17 @@ com.minimes
 │  ├─ mapper      OeeMapper (v_oee_daily, v_oee_monthly) → resources/mapper/production/OeeMapper.xml
 │  ├─ service     ProductionAggregationService (집계), ProductionAggregationScheduler (1분마다)
 │  └─ web         OeeController
-├─ monitoring     설비 현황 대시보드
+├─ alarm          관리한계(UCL) 계산, 알람 기록·확인
+│  ├─ domain      EquipmentLimit (equipment_limit), EquipmentAlarm (equipment_alarm), LimitMetric, AlarmType
+│  ├─ repository
+│  ├─ mapper      SensorStatsMapper (가동 데이터 평균·표준편차) → resources/mapper/alarm/
+│  ├─ service     AlarmService (저장 이벤트 → 한계 비교), LimitCalculationService (UCL = 평균 + 3σ)
+│  └─ web         AlarmController (/api/alarms, /api/equipment-limits)
+├─ monitoring     설비 현황 대시보드, 정지 사유 파레토
 │  ├─ push        DashboardPusher (저장·집계 이벤트 → 1초마다 /topic/dashboard로 전송)
 │  ├─ mapper      MonitoringMapper (설비별 최신 상태, OUTER APPLY) → resources/mapper/monitoring/
-│  ├─ service     MonitoringService (공장 시계 기준 판단), Dashboard (응답)
-│  └─ web         MonitoringController (/api/monitoring), MonitoringPageController (/monitoring 화면)
+│  ├─ service     MonitoringService (공장 시계 기준 판단), DowntimeParetoService (비율, 80% 표시)
+│  └─ web         MonitoringController (/api/monitoring), MonitoringPageController (/monitoring, /monitoring/pareto 화면)
 └─ equipment      설비 데이터 수집
    ├─ domain      EquipmentData(원본), EquipmentStatusLog(상태 이력), Downtime(비가동)
    ├─ repository
@@ -134,6 +153,11 @@ com.minimes
 | GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
 | GET | `/api/oee/monthly?month=2025-10` | 설비별 월별 OEE (시간·수량 합산 후 계산) |
 | POST | `/api/production-daily/aggregate?date=2026-10-17` | 그날 집계 다시 하기 |
+| GET | `/api/monitoring/downtime-pareto?from=2025-10-01&to=2025-10-31&equipCode=CNC03&byReason=true` | 정지 사유 파레토 (모든 조건 생략 가능) |
+| GET | `/api/alarms?open=true` | 알람 목록 (open=false면 최근 100건) |
+| POST | `/api/alarms/{alarmId}/ack` | 알람 확인 (`{"ackBy":"kim"}`) |
+| GET | `/api/equipment-limits` | 설비별 관리한계 |
+| POST | `/api/equipment-limits/calculate?from=&to=` | 관리한계 계산 (기준 기간 가동 데이터, UCL = 평균 + 3σ) |
 | WebSocket | `/ws` → 구독 `/topic/dashboard` | 대시보드 실시간 수신 (STOMP, 본문은 `/api/monitoring/dashboard`와 같음) |
 
 오류 응답은 항상 같은 형식입니다.

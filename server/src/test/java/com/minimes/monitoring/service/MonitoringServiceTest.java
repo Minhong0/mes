@@ -2,6 +2,7 @@ package com.minimes.monitoring.service;
 
 import com.minimes.monitoring.mapper.EquipmentNow;
 import com.minimes.monitoring.mapper.MonitoringMapper;
+import com.minimes.monitoring.mapper.OpenAlarm;
 import com.minimes.monitoring.service.Dashboard.EquipmentCard;
 import com.minimes.production.mapper.OeeDaily;
 import com.minimes.production.mapper.OeeMapper;
@@ -103,6 +104,22 @@ class MonitoringServiceTest {
         assertThat(cards.get(0).today()).isNull();
         assertThat(cards.get(1).today().oee()).isEqualByComparingTo("88.00");
         assertThat(cards.get(1).today().prodQty()).isEqualTo(44);
+    }
+
+    @Test
+    @DisplayName("확인 전 알람은 설비별로 나눠 붙이고, 없는 설비는 빈 목록")
+    void alarms() {
+        when(monitoringMapper.selectEquipmentNow()).thenReturn(List.of(
+                running("CNC01", "2026-10-18T09:00", "2026-10-18T10:00"),
+                running("CNC03", "2026-10-18T09:00", "2026-10-18T10:00")));
+        when(monitoringMapper.selectOpenAlarms()).thenReturn(List.of(
+                new OpenAlarm(7, "CNC03", "TEMP_UCL", new BigDecimal("40.2"), new BigDecimal("39.100"), LocalDateTime.parse("2026-10-18T09:50")),
+                new OpenAlarm(5, "CNC03", "VIBRATION_UCL", new BigDecimal("2.10"), new BigDecimal("1.700"), LocalDateTime.parse("2026-10-18T09:40"))));
+
+        List<EquipmentCard> cards = service.dashboard().equipment();
+
+        assertThat(cards.get(0).alarms()).isEmpty();
+        assertThat(cards.get(1).alarms()).extracting(OpenAlarm::alarmId).containsExactly(7L, 5L);
     }
 
     @Test

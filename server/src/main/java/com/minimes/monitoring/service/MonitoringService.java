@@ -3,6 +3,7 @@ package com.minimes.monitoring.service;
 import com.minimes.equipment.service.EquipmentStatusService;
 import com.minimes.monitoring.mapper.EquipmentNow;
 import com.minimes.monitoring.mapper.MonitoringMapper;
+import com.minimes.monitoring.mapper.OpenAlarm;
 import com.minimes.monitoring.service.Dashboard.EquipmentCard;
 import com.minimes.monitoring.service.Dashboard.Stop;
 import com.minimes.monitoring.service.Dashboard.TodayOee;
@@ -50,13 +51,18 @@ public class MonitoringService {
         Map<String, OeeDaily> oeeByEquip = oeeMapper.selectDaily(prodDate).stream()
                 .collect(Collectors.toMap(OeeDaily::equipCode, Function.identity()));
 
+        // 설비 코드 → 확인 전 알람들. groupingBy는 순서를 지키므로 설비 안에서도 최근 것부터다.
+        Map<String, List<OpenAlarm>> alarmsByEquip = monitoringMapper.selectOpenAlarms().stream()
+                .collect(Collectors.groupingBy(OpenAlarm::equipCode));
+
         List<EquipmentCard> cards = rows.stream()
-                .map(row -> toCard(row, factoryNow, oeeByEquip.get(row.equipCode())))
+                .map(row -> toCard(row, factoryNow, oeeByEquip.get(row.equipCode()),
+                        alarmsByEquip.getOrDefault(row.equipCode(), List.of())))
                 .toList();
         return new Dashboard(factoryNow, prodDate, cards);
     }
 
-    private EquipmentCard toCard(EquipmentNow row, LocalDateTime factoryNow, OeeDaily oee) {
+    private EquipmentCard toCard(EquipmentNow row, LocalDateTime factoryNow, OeeDaily oee, List<OpenAlarm> alarms) {
         boolean online = row.lastSeenAt() != null
                 && Duration.between(row.lastSeenAt(), factoryNow).compareTo(EquipmentStatusService.OFFLINE_GAP) <= 0;
         Long statusMinutes = row.statusSince() == null ? null : Duration.between(row.statusSince(), factoryNow).toMinutes();
@@ -67,6 +73,6 @@ public class MonitoringService {
 
         return new EquipmentCard(row.equipCode(), row.equipName(), online, row.status(), row.statusName(),
                 row.statusSince(), statusMinutes, stop, row.cycleCount(), row.spindleVibration(), row.spindleTemp(),
-                row.lastSeenAt(), today);
+                row.lastSeenAt(), today, alarms);
     }
 }

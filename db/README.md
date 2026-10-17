@@ -26,6 +26,7 @@ done
 - `-I`: sqlcmd는 기본으로 `QUOTED_IDENTIFIER`가 꺼져 있어, 계산 컬럼(`production_daily.run_min`)이 있는 테이블에 쓰기가 실패합니다. 스크립트 안에도 `SET QUOTED_IDENTIFIER ON`을 넣어 두었습니다.
 - `-f 65001`: 한글 주석과 데이터를 UTF-8로 읽습니다.
 - 처음부터 다시 만들려면 먼저 `DROP DATABASE minimes`를 실행합니다.
+- `06_equipment_limit.sql`은 테이블이 없을 때만 만들므로, 이미 만든 DB에 이 파일만 따로 실행해도 됩니다.
 
 ## 초기 데이터 (seed)
 
@@ -48,7 +49,7 @@ seed 파일은 자동 생성 파일이므로 직접 고치지 말고, CSV나 스
 
 ## 수집 데이터 초기화
 
-시뮬레이터로 쌓은 데이터(`equipment_data`, 상태 이력, `EQUIP` 비가동, `MES` 생산 실적)만 지웁니다. 기준정보와 부트캠프 실적은 남습니다. 서버를 끈 뒤 실행합니다.
+시뮬레이터로 쌓은 데이터(`equipment_data`, 상태 이력, `EQUIP` 비가동, `MES` 생산 실적, 관리한계 알람)만 지웁니다. 기준정보, 부트캠프 실적, 관리한계(`equipment_limit`)는 남습니다. 서버를 끈 뒤 실행합니다.
 
 ```bash
 source .env

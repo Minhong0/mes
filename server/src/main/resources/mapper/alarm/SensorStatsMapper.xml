@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.minimes.alarm.mapper.SensorStatsMapper">
+
+    <!--
+        가동(RUN) 중인 데이터만 쓴다. 정지 중에는 스핀들이 멈춰 진동이 0에 가까우므로, 섞으면 평균이 내려가고 퍼짐이 커진다.
+        STDEV: 표본 표준편차 (n - 1로 나눔). 표본이 1개면 NULL.
+        DECIMAL에 AVG를 쓰면 소수 자릿수가 원래 컬럼(3자리)을 따라가므로, FLOAT로 바꿔 계산한 뒤 돌려준다.
+    -->
+    <select id="selectRunStats" resultType="com.minimes.alarm.mapper.SensorStats">
+        SELECT
+            d.equip_code,
+            COUNT(*)                                   AS sample_count,
+            AVG(CAST(d.spindle_vibration AS FLOAT))    AS vibration_mean,
+            STDEV(CAST(d.spindle_vibration AS FLOAT))  AS vibration_sigma,
+            AVG(CAST(d.spindle_temp AS FLOAT))         AS temp_mean,
+            STDEV(CAST(d.spindle_temp AS FLOAT))       AS temp_sigma
+        FROM equipment_data d
+        JOIN equipment e ON e.equip_code = d.equip_code
+        WHERE e.auto_collect = 'Y'
+          AND d.status = 'RUN'
+          AND d.collected_at &gt;= #{from}
+          AND d.collected_at &lt; #{to}
+          AND d.spindle_vibration IS NOT NULL
+          AND d.spindle_temp IS NOT NULL
+        GROUP BY d.equip_code
+        ORDER BY d.equip_code
+    </select>
+
+</mapper>

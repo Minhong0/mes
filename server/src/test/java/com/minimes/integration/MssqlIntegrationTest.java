@@ -22,6 +22,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.OffsetDateTime;
 
+import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -199,5 +200,69 @@ class MssqlIntegrationTest {
     private void sendCnc03(String collectedAt, int cycleCount, String status, String dtCat, String dtSub) {
         equipmentDataService.save(new EquipmentMessage("CNC03-IT-" + collectedAt, "CNC03", OffsetDateTime.parse(collectedAt),
                 cycleCount, status, new BigDecimal("1.2"), new BigDecimal("35.0"), dtCat, dtSub));
+    }
+
+    @Test
+    @DisplayName("정지 사유 파레토 (윈도 함수 누계): 부트캠프 2025-10, 220건 6,990분, 1위 지그 교체 979분 14.0%")
+    void downtimePareto() throws Exception {
+        mockMvc.perform(get("/api/monitoring/downtime-pareto").param("from", "2025-10-01").param("to", "2025-10-31"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalMin").value(6990))
+                .andExpect(jsonPath("$.stopCount").value(220))
+                .andExpect(jsonPath("$.items[0].dtSubName").value("지그 교체"))
+                .andExpect(jsonPath("$.items[0].totalMin").value(979))
+                .andExpect(jsonPath("$.items[0].sharePct").value(14.0))
+                .andExpect(jsonPath("$.items[-1].cumulativePct").value(100.0));
+
+        mockMvc.perform(get("/api/monitoring/downtime-pareto")
+                        .param("from", "2025-10-01").param("to", "2025-10-31").param("byReason", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].dtCat").value("SETUP"))
+                .andExpect(jsonPath("$.items[0].dtSub").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("관리한계 (STDEV): CNC04 가동 40건으로 UCL = 평균 + 3σ, 넘는 메시지 → 알람 → 대시보드에 표시 → 확인 두 번이면 409")
+    void alarmLimit() throws Exception {
+        double[] vibration = new double[40];
+        for (int i = 0; i < 40; i++) {
+            vibration[i] = 1.0 + (i % 6) * 0.1;
+            sendCnc04(String.format("2026-10-20T%02d:%02d:00+09:00", 8 + i / 6, (i % 6) * 10), vibration[i], 35.0 + i % 4);
+        }
+        double mean = java.util.Arrays.stream(vibration).average().orElseThrow();
+        double sigma = Math.sqrt(java.util.Arrays.stream(vibration).map(v -> (v - mean) * (v - mean)).sum() / 39);
+
+        mockMvc.perform(post("/api/equipment-limits/calculate").param("from", "2026-10-20").param("to", "2026-10-20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].equipCode").value("CNC04"))
+                .andExpect(jsonPath("$[0].metric").value("VIBRATION"))
+                .andExpect(jsonPath("$[0].sampleCount").value(40))
+                .andExpect(jsonPath("$[0].ucl").value(closeTo(mean + 3 * sigma, 0.0006)));
+
+        sendCnc04("2026-10-20T15:00:00+09:00", 2.5, 36.0);
+
+        String alarms = mockMvc.perform(get("/api/alarms"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].equipCode").value("CNC04"))
+                .andExpect(jsonPath("$[0].alarmType").value("VIBRATION_UCL"))
+                .andReturn().getResponse().getContentAsString();
+        int alarmId = JsonPath.read(alarms, "$[0].alarmId");
+
+        mockMvc.perform(get("/api/monitoring/dashboard"))
+                .andExpect(jsonPath("$.equipment[3].equipCode").value("CNC04"))
+                .andExpect(jsonPath("$.equipment[3].alarms[0].alarmType").value("VIBRATION_UCL"));
+
+        mockMvc.perform(post("/api/alarms/{id}/ack", alarmId).contentType(MediaType.APPLICATION_JSON).content("{\"ackBy\":\"kim\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ackBy").value("kim"));
+        mockMvc.perform(post("/api/alarms/{id}/ack", alarmId).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ALARM_ALREADY_ACKNOWLEDGED"));
+    }
+
+    private void sendCnc04(String collectedAt, double vibration, double temp) {
+        equipmentDataService.save(new EquipmentMessage("CNC04-IT-" + collectedAt, "CNC04", OffsetDateTime.parse(collectedAt),
+                1, "RUN", BigDecimal.valueOf(vibration), BigDecimal.valueOf(temp), null, null));
     }
 }

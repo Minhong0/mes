@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
  * 둘 중 하나가 실패하면 원본 저장도 취소되고, 브로커가 다시 보낸 메시지로 처음부터 다시 처리한다.
  * 중복 메시지는 여기서 걸러지므로 상태 이력이 두 번 바뀌는 일도 없다.
  *
- * 저장이 끝나면 EquipmentDataSavedEvent를 알린다. 이 서비스는 누가 그 소식을 듣는지(모니터링 화면 push 등) 모른다.
+ * 저장이 끝나면 EquipmentDataSavedEvent를 알린다. 이 서비스는 누가 그 소식을 듣는지(관리한계 경보, 화면 push) 모른다.
  */
 @Slf4j
 @Service
@@ -64,7 +64,8 @@ public class EquipmentDataService {
             equipmentStatusService.apply(message.equipCode(), status,
                     message.downtimeCategory(), message.downtimeReason(), collectedAt);
         }
-        eventPublisher.publishEvent(new EquipmentDataSavedEvent(message.equipCode()));
+        eventPublisher.publishEvent(new EquipmentDataSavedEvent(message.equipCode(), collectedAt, status,
+                message.spindleVibration(), message.spindleTemp()));
         return SaveResult.SAVED;
     }
 
