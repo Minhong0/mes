@@ -1,9 +1,72 @@
-﻿<Application x:Class="MiniMes.Pop.App"
+<Application x:Class="MiniMes.Pop.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:MiniMes.Pop"
-             StartupUri="MainWindow.xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- 현장 단말은 장갑을 끼고 터치로 쓰는 경우가 많아, 버튼과 글자를 크게 잡는다 -->
     <Application.Resources>
-         
+        <SolidColorBrush x:Key="Bg" Color="#F4F5F7" />
+        <SolidColorBrush x:Key="Card" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="Line" Color="#E3E6EB" />
+        <SolidColorBrush x:Key="Text" Color="#1D2330" />
+        <SolidColorBrush x:Key="Muted" Color="#6B7280" />
+        <SolidColorBrush x:Key="Accent" Color="#2F6FDF" />
+        <SolidColorBrush x:Key="Run" Color="#1F9D55" />
+        <SolidColorBrush x:Key="Down" Color="#D64545" />
+        <SolidColorBrush x:Key="Warn" Color="#D9930D" />
+
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Text}" />
+            <Setter Property="FontSize" Value="18" />
+        </Style>
+
+        <Style x:Key="MutedText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="FontSize" Value="15" />
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="MinWidth" Value="52" />
+            <Setter Property="Padding" Value="16,4" />
+            <Setter Property="Margin" Value="4" />
+            <Setter Property="Background" Value="{StaticResource Card}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+
+        <!-- 주요 동작 버튼 (시작, 실적 등록) -->
+        <Style x:Key="Primary" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource Accent}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="MinHeight" Value="44" />
+            <Setter Property="MinWidth" Value="140" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Margin" Value="4" />
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="MinHeight" Value="52" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Margin" Value="4" />
+        </Style>
+
+        <Style x:Key="Panel" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Card}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="16" />
+            <Setter Property="Margin" Value="8" />
+        </Style>
     </Application.Resources>
 </Application>

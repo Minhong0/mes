@@ -100,6 +100,29 @@ public class WorkOrder {
         status = WorkOrderStatus.CLOSED;
     }
 
+    /** 모든 공정이 끝났으면 진행 → 완료 */
+    void completeIfAllOperationsDone(LocalDateTime now) {
+        boolean allDone = operations.stream().allMatch(op -> op.getStatus() == WorkOrderOperation.Status.DONE);
+        if (allDone && status == WorkOrderStatus.RUN) {
+            complete(now);
+        }
+    }
+
+    /** 공정을 시작하거나 실적을 받으려면 작업지시가 진행 중이어야 한다. */
+    void requireAcceptingResults() {
+        if (status != WorkOrderStatus.RUN) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION,
+                    "%s 상태의 작업지시에는 작업할 수 없습니다. (RUN 상태에서만 가능)".formatted(status));
+        }
+    }
+
+    /** 마감한 작업지시는 실적을 바꿀 수 없다 (취소 포함). */
+    void requireNotClosed() {
+        if (status == WorkOrderStatus.CLOSED) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION, "마감한 작업지시의 실적은 바꿀 수 없습니다.");
+        }
+    }
+
     public List<WorkOrderOperation> getOperations() {
         return Collections.unmodifiableList(operations);   // 밖에서 목록을 직접 고치지 못하게 막는다
     }

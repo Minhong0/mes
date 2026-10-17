@@ -10,7 +10,7 @@
 | 폴더 | 내용 | 기술 |
 | --- | --- | --- |
 | `server/` | MES 서버 (기준정보, 작업지시, 실적, LOT 추적, OEE) | Java 21, Spring Boot 4.0, JPA, MyBatis, Thymeleaf |
-| `pop/` | 현장 작업자용 POP 단말 | C# .NET 8, WPF (MVVM) |
+| `pop/` | 현장 작업자용 POP 단말 (작업 시작, 실적·불량 등록, 공정 완료) | C# .NET 8, WPF (MVVM), xUnit |
 | `simulator/` | 설비(CNC01~05) 데이터 시뮬레이터 | C# .NET 8, MQTTnet |
 | `tools/` | 부트캠프 엑셀을 seed SQL로 변환하는 스크립트 | Python, openpyxl |
 | `data/master/` | 기준정보 CSV (품목, BOM, 라우팅, 작업장, 설비) | CSV |

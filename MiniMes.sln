@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniMes.Pop", "pop\MiniMes.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniMes.Simulator", "simulator\MiniMes.Simulator\MiniMes.Simulator.csproj", "{75108130-D8E6-42D4-B214-9DED44FCC8D6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MiniMes.Pop.Tests", "pop\MiniMes.Pop.Tests\MiniMes.Pop.Tests.csproj", "{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,6 +45,18 @@ Global
 		{75108130-D8E6-42D4-B214-9DED44FCC8D6}.Release|x64.Build.0 = Release|Any CPU
 		{75108130-D8E6-42D4-B214-9DED44FCC8D6}.Release|x86.ActiveCfg = Release|Any CPU
 		{75108130-D8E6-42D4-B214-9DED44FCC8D6}.Release|x86.Build.0 = Release|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Debug|x64.Build.0 = Debug|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Debug|x86.Build.0 = Debug|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Release|x64.ActiveCfg = Release|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Release|x64.Build.0 = Release|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Release|x86.ActiveCfg = Release|Any CPU
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -50,5 +64,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{149C6D6B-74D6-46B1-9A53-BE9B18F5AD5B} = {92754CDA-671E-76DF-9731-03C79924CE61}
 		{75108130-D8E6-42D4-B214-9DED44FCC8D6} = {92754CDA-671E-76DF-9731-03C79924CE61}
+		{FBBF66B3-E91F-48DE-8B7D-CE085AE5559C} = {92754CDA-671E-76DF-9731-03C79924CE61}
 	EndGlobalSection
 EndGlobal

@@ -1,0 +1,74 @@
+package com.minimes.workorder.web;
+
+import com.minimes.workorder.mapper.OperationItem;
+import com.minimes.workorder.service.OperationService;
+import com.minimes.workorder.service.OperationService.ReportCommand;
+import com.minimes.workorder.web.OperationDtos.CancelRequest;
+import com.minimes.workorder.web.OperationDtos.ReportRequest;
+import com.minimes.workorder.web.OperationDtos.ResultResponse;
+import com.minimes.workorder.web.OperationDtos.WorkerRequest;
+import com.minimes.workorder.web.WorkOrderDtos.OperationResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+/** 현장 POP가 부르는 API. 작업자는 로그인 대신 사번(workerId)을 요청마다 보낸다. */
+@Tag(name = "공정 작업 (POP)", description = "작업 목록, 공정 시작, 실적 등록·취소, 공정 완료")
+@RestController
+@RequestMapping("/api")
+@RequiredArgsConstructor
+public class OperationController {
+
+    private final OperationService operationService;
+
+    @Operation(summary = "작업장의 작업 목록", description = "대기·진행 중인 공정. 진행 중인 것이 먼저, 그다음 납기 순")
+    @GetMapping("/work-centers/{wcCode}/operations")
+    public List<OperationItem> openOperations(@PathVariable String wcCode) {
+        return operationService.openOperations(wcCode);
+    }
+
+    @Operation(summary = "공정 시작 (대기 → 진행)", description = "작업지시가 대기면 함께 진행으로 바뀐다")
+    @PostMapping("/operations/{woOpId}/start")
+    public OperationResponse start(@PathVariable long woOpId, @Valid @RequestBody WorkerRequest req) {
+        return OperationResponse.from(operationService.start(woOpId, req.workerId()));
+    }
+
+    @Operation(summary = "실적 등록", description = "양품 수량과 불량 내역. 같은 requestId로 다시 보내면 처음 저장한 실적을 돌려준다")
+    @PostMapping("/operations/{woOpId}/results")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ResultResponse report(@PathVariable long woOpId, @Valid @RequestBody ReportRequest req) {
+        ReportCommand command = new ReportCommand(req.requestId(), req.workerId(),
+                req.equipCode() == null || req.equipCode().isBlank() ? null : req.equipCode(),
+                req.goodQty(), req.defectLines());
+        return ResultResponse.from(operationService.report(woOpId, command));
+    }
+
+    @Operation(summary = "공정의 실적 목록", description = "최근 것부터. 취소한 실적도 표시와 함께 나온다")
+    @GetMapping("/operations/{woOpId}/results")
+    public List<ResultResponse> results(@PathVariable long woOpId) {
+        return operationService.results(woOpId).stream().map(ResultResponse::from).toList();
+    }
+
+    @Operation(summary = "공정 완료 (진행 → 완료)", description = "마지막 공정까지 끝나면 작업지시도 완료된다")
+    @PostMapping("/operations/{woOpId}/complete")
+    public OperationResponse complete(@PathVariable long woOpId, @Valid @RequestBody WorkerRequest req) {
+        return OperationResponse.from(operationService.complete(woOpId, req.workerId()));
+    }
+
+    @Operation(summary = "실적 취소", description = "행을 지우지 않고 취소 표시. 공정 합계에서 빠진다. 마감한 작업지시는 불가")
+    @PostMapping("/results/{resultId}/cancel")
+    public ResultResponse cancel(@PathVariable long resultId, @Valid @RequestBody CancelRequest req) {
+        return ResultResponse.from(operationService.cancel(resultId, req.workerId(), req.reason()));
+    }
+}

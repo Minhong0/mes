@@ -143,4 +143,14 @@ INSERT INTO inspection_spec (process_code, inspect_code, inspect_name, equip_cod
     ('OP-60', 'PCD', N'스플라인 PCD', 'CMM-01', 'mm', 32, 31.97, 32.03),
     ('OP-60', 'HRC', N'표면 경도', 'HT-01', 'HRC', NULL, 58, 62),
     ('OP-60', 'RA', N'표면 거칠기', 'SR-01', 'um', NULL, NULL, 0.8);
+
+-- worker: 7건
+INSERT INTO worker (worker_id, worker_name, wc_code, role) VALUES
+    ('W1001', N'김도윤', 'WC-100', 'OPERATOR'),
+    ('W1002', N'이서준', 'WC-100', 'OPERATOR'),
+    ('W2001', N'박지호', 'WC-200', 'OPERATOR'),
+    ('W2002', N'최하준', 'WC-200', 'OPERATOR'),
+    ('W4001', N'정민재', 'WC-400', 'OPERATOR'),
+    ('W6001', N'강예린', 'WC-600', 'QC'),
+    ('W9001', N'윤서연', NULL, 'ADMIN');
 GO

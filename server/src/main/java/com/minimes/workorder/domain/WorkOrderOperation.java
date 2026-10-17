@@ -1,5 +1,7 @@
 package com.minimes.workorder.domain;
 
+import com.minimes.common.error.BusinessException;
+import com.minimes.common.error.ErrorCode;
 import com.minimes.master.domain.Routing;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -66,5 +68,46 @@ public class WorkOrderOperation {
         op.goodQty = 0;
         op.defectQty = 0;
         return op;
+    }
+
+    /** 대기 → 진행. 작업지시가 아직 대기면 함께 진행으로 바꾼다 (첫 공정을 시작하는 순간이 작업지시 시작). */
+    public void start(LocalDateTime now) {
+        requireStatus(Status.WAIT, "시작");
+        if (workOrder.getStatus() == WorkOrderStatus.WAIT) {
+            workOrder.start(now);
+        }
+        workOrder.requireAcceptingResults();
+        status = Status.RUN;
+        startedAt = now;
+    }
+
+    /** 실적 등록: 진행 중일 때만 받는다. */
+    public void addResult(int good, int defect) {
+        requireStatus(Status.RUN, "실적 등록");
+        workOrder.requireAcceptingResults();
+        goodQty += good;
+        defectQty += defect;
+    }
+
+    /** 실적 취소: 등록했던 수량을 뺀다. 공정이 끝났어도 작업지시가 마감 전이면 취소할 수 있다. */
+    public void removeResult(int good, int defect) {
+        workOrder.requireNotClosed();
+        goodQty -= good;
+        defectQty -= defect;
+    }
+
+    /** 진행 → 완료. 마지막 공정까지 모두 끝나면 작업지시도 완료된다. */
+    public void complete(LocalDateTime now) {
+        requireStatus(Status.RUN, "완료");
+        status = Status.DONE;
+        endedAt = now;
+        workOrder.completeIfAllOperationsDone(now);
+    }
+
+    private void requireStatus(Status expected, String action) {
+        if (status != expected) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION,
+                    "%s 상태의 공정은 %s할 수 없습니다. (%s 상태에서만 가능)".formatted(status, action, expected));
+        }
     }
 }

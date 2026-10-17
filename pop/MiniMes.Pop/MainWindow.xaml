@@ -1,12 +1,24 @@
-﻿<Window x:Class="MiniMes.Pop.MainWindow"
+<Window x:Class="MiniMes.Pop.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:MiniMes.Pop"
-        mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        xmlns:vm="clr-namespace:MiniMes.Pop.ViewModels"
+        xmlns:views="clr-namespace:MiniMes.Pop.Views"
+        Title="Mini-MES POP" Height="820" Width="1280" MinHeight="640" MinWidth="1024"
+        Background="{StaticResource Bg}" FontFamily="Malgun Gothic"
+        AutomationProperties.Name="Mini-MES POP">
+    <!-- AutomationProperties.Name: 화면 낭독기·UI 자동화가 읽는 창 이름. 지정하지 않으면 안에 든 ViewModel의 클래스 이름이 읽힌다 -->
+    <!--
+        CurrentPage에 들어 있는 ViewModel 종류에 맞는 화면을 DataTemplate이 골라 그린다.
+        LoginViewModel이면 LoginView, WorkViewModel이면 WorkView.
+    -->
+    <Window.Resources>
+        <DataTemplate DataType="{x:Type vm:LoginViewModel}">
+            <views:LoginView />
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:WorkViewModel}">
+            <views:WorkView />
+        </DataTemplate>
+    </Window.Resources>
 
-    </Grid>
+    <ContentControl Content="{Binding CurrentPage}" />
 </Window>

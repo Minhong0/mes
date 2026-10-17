@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.minimes.workorder.mapper.WorkListMapper">
+
+    <!--
+        작업자가 고를 작업: 이 작업장의 공정 중 대기·진행 중인 것 (작업지시도 대기·진행 중일 때만).
+        prev: 바로 앞 공정. 앞 공정의 양품 수량이 이 공정이 받아서 가공할 수 있는 수량이다.
+              순번(seq)이 10, 20, 30처럼 띄엄띄엄이라 "seq - 10"이 아니라 "나보다 작은 것 중 가장 큰 seq"로 찾는다.
+    -->
+    <select id="selectOpenOperations" resultType="com.minimes.workorder.mapper.OperationItem">
+        SELECT
+            op.wo_op_id,
+            op.wo_no,
+            op.seq,
+            op.process_code,
+            p.process_name,
+            op.wc_code,
+            op.status,
+            op.good_qty,
+            op.defect_qty,
+            op.started_at,
+            wo.item_code,
+            i.item_name,
+            wo.plan_qty,
+            wo.due_date,
+            wo.status    AS wo_status,
+            prev.good_qty AS prev_good_qty
+        FROM work_order_operation op
+        JOIN work_order wo ON wo.wo_no = op.wo_no
+        JOIN item i ON i.item_code = wo.item_code
+        JOIN process p ON p.process_code = op.process_code
+        LEFT JOIN work_order_operation prev
+               ON prev.wo_no = op.wo_no
+              AND prev.seq = (SELECT MAX(x.seq) FROM work_order_operation x WHERE x.wo_no = op.wo_no AND x.seq &lt; op.seq)
+        WHERE op.wc_code = #{wcCode}
+          AND op.status IN ('WAIT', 'RUN')
+          AND wo.status IN ('WAIT', 'RUN')
+        ORDER BY CASE op.status WHEN 'RUN' THEN 0 ELSE 1 END, wo.due_date, wo.wo_no
+    </select>
+
+</mapper>

@@ -8,6 +8,7 @@ import com.minimes.master.web.MasterResponses.CodeResponse;
 import com.minimes.master.web.MasterResponses.EquipmentResponse;
 import com.minimes.master.web.MasterResponses.ItemResponse;
 import com.minimes.master.web.MasterResponses.RoutingResponse;
+import com.minimes.master.web.MasterResponses.WorkerResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-@Tag(name = "기준정보", description = "품목, 라우팅, BOM, 설비, 공통코드 조회")
+@Tag(name = "기준정보", description = "품목, 라우팅, BOM, 설비, 공통코드, 작업자 조회")
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
@@ -65,5 +66,11 @@ public class MasterController {
     @GetMapping("/common-codes/{groupCode}")
     public List<CodeResponse> codes(@PathVariable String groupCode) {
         return masterQueryService.findCodes(groupCode).stream().map(CodeResponse::from).toList();
+    }
+
+    @Operation(summary = "작업자 확인", description = "POP 로그인: 사번으로 사용 중인 작업자를 찾는다. 없으면 404 WORKER_NOT_FOUND")
+    @GetMapping("/workers/{workerId}")
+    public WorkerResponse worker(@PathVariable String workerId) {
+        return WorkerResponse.from(masterQueryService.getActiveWorker(workerId));
     }
 }

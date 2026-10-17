@@ -1,6 +1,7 @@
 package com.minimes.master.web;
 
 import com.minimes.master.domain.CommonCode;
+import com.minimes.master.domain.Worker;
 import com.minimes.master.domain.Equipment;
 import com.minimes.master.domain.Item;
 import com.minimes.master.domain.ManufacturingProcess;
@@ -44,6 +45,12 @@ public final class MasterResponses {
     public record CodeResponse(String code, String codeName, String parentCode) {
         public static CodeResponse from(CommonCode c) {
             return new CodeResponse(c.getCode(), c.getCodeName(), c.getParentCode());
+        }
+    }
+
+    public record WorkerResponse(String workerId, String workerName, String wcCode, String role) {
+        public static WorkerResponse from(Worker w) {
+            return new WorkerResponse(w.getWorkerId(), w.getWorkerName(), w.getWcCode(), w.getRole());
         }
     }
 }

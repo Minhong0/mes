@@ -265,4 +265,61 @@ class MssqlIntegrationTest {
         equipmentDataService.save(new EquipmentMessage("CNC04-IT-" + collectedAt, "CNC04", OffsetDateTime.parse(collectedAt),
                 1, "RUN", BigDecimal.valueOf(vibration), BigDecimal.valueOf(temp), null, null));
     }
+
+    @Test
+    @DisplayName("POP 흐름: 작업지시 생성 → 작업 목록 → 시작 → 실적(같은 요청 두 번) → 취소 → 완료, 입력 오류는 400")
+    void popFlow() throws Exception {
+        String created = mockMvc.perform(post("/api/work-orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemCode\":\"FG-SFT-100\",\"planQty\":20}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String woNo = JsonPath.read(created, "$.woNo");
+        int op10 = JsonPath.read(created, "$.operations[0].woOpId");
+
+        mockMvc.perform(get("/api/workers/W1001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workerName").value("김도윤"))
+                .andExpect(jsonPath("$.wcCode").value("WC-100"));
+        mockMvc.perform(get("/api/workers/W0000"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("WORKER_NOT_FOUND"));
+
+        mockMvc.perform(get("/api/work-centers/WC-100/operations"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.woNo == '" + woNo + "')].processName").value(hasItem("CNC 선삭")));
+
+        mockMvc.perform(post("/api/operations/{id}/start", op10).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W1001\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("RUN"));
+
+        String report = "{\"requestId\":\"it-req-1\",\"workerId\":\"W1001\",\"equipCode\":\"CNC01\",\"goodQty\":8,"
+                + "\"defects\":[{\"defectType\":\"OVERSIZE\",\"qty\":2}]}";
+        String first = mockMvc.perform(post("/api/operations/{id}/results", op10).contentType(MediaType.APPLICATION_JSON).content(report))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.defects[0].defectType").value("OVERSIZE"))
+                .andReturn().getResponse().getContentAsString();
+        int resultId = JsonPath.read(first, "$.resultId");
+        mockMvc.perform(post("/api/operations/{id}/results", op10).contentType(MediaType.APPLICATION_JSON).content(report))
+                .andExpect(jsonPath("$.resultId").value(resultId));   // 다시 보내도 같은 실적
+
+        mockMvc.perform(post("/api/operations/{id}/results", op10).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"requestId\":\"it-req-2\",\"workerId\":\"W1001\",\"goodQty\":-1,\"defects\":[]}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/results/{id}/cancel", resultId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W1001\",\"reason\":\"수량 오입력\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cancelled").value(true));
+
+        mockMvc.perform(get("/api/work-orders/{woNo}", woNo))
+                .andExpect(jsonPath("$.status").value("RUN"))
+                .andExpect(jsonPath("$.operations[0].goodQty").value(0))
+                .andExpect(jsonPath("$.operations[0].defectQty").value(0));
+
+        mockMvc.perform(post("/api/operations/{id}/complete", op10).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W1001\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DONE"));
+    }
 }

@@ -8,6 +8,7 @@ import com.minimes.master.domain.Item;
 import com.minimes.master.domain.ItemType;
 import com.minimes.master.domain.ManufacturingProcess;
 import com.minimes.master.domain.Routing;
+import com.minimes.master.domain.Worker;
 import com.minimes.master.mapper.BomMapper;
 import com.minimes.master.mapper.BomNode;
 import com.minimes.master.repository.CommonCodeRepository;
@@ -15,6 +16,7 @@ import com.minimes.master.repository.EquipmentRepository;
 import com.minimes.master.repository.ItemRepository;
 import com.minimes.master.repository.ProcessRepository;
 import com.minimes.master.repository.RoutingRepository;
+import com.minimes.master.repository.WorkerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +37,7 @@ public class MasterQueryService {
     private final ProcessRepository processRepository;
     private final EquipmentRepository equipmentRepository;
     private final CommonCodeRepository commonCodeRepository;
+    private final WorkerRepository workerRepository;
     private final BomMapper bomMapper;
 
     public List<Item> findItems(ItemType type) {
@@ -70,5 +73,12 @@ public class MasterQueryService {
 
     public List<CommonCode> findCodes(String groupCode) {
         return commonCodeRepository.findByGroupCodeOrderBySortOrder(groupCode);
+    }
+
+    /** 사용 중인 작업자. 없거나 퇴사(use_yn = N)면 404 */
+    public Worker getActiveWorker(String workerId) {
+        return workerRepository.findById(workerId)
+                .filter(Worker::isActive)
+                .orElseThrow(() -> new BusinessException(ErrorCode.WORKER_NOT_FOUND, "작업자를 찾을 수 없습니다: " + workerId));
     }
 }

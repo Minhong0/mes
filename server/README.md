@@ -27,6 +27,18 @@ http://localhost:8080/monitoring 에서 CNC01~05의 현재 상태, 진행 중인
 
 http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. 기간·설비를 고르면 사유별 정지 시간(막대)과 누적 비율(선)을 보여 주고, 누적 80%까지를 중점 관리 대상으로 표시합니다. 예: `?from=2025-10-01&to=2025-10-31` (부트캠프 실적)
 
+## POP(현장 단말) API
+
+현장 POP([pop/README.md](../pop/README.md))가 부르는 API입니다. 작업자는 로그인 세션 없이 사번(`workerId`)을 요청마다 보냅니다.
+
+1. `GET /api/workers/{workerId}`로 작업자를 확인합니다 (없거나 퇴사면 404 `WORKER_NOT_FOUND`).
+2. `GET /api/work-centers/{wcCode}/operations`로 작업장의 대기·진행 중인 공정을 받습니다. 앞 공정 양품 수량(`prevGoodQty`)이 함께 옵니다.
+3. 공정 시작 → 실적 등록(여러 번) → 공정 완료. 첫 공정을 시작하면 작업지시가 진행이 되고, 마지막 공정을 완료하면 작업지시가 완료됩니다.
+4. 실적에는 POP가 만든 `requestId`를 붙입니다. 같은 `requestId`로 다시 보내면 새로 저장하지 않고 처음 실적을 돌려줍니다 (`work_result.request_id` 필터 UNIQUE 인덱스).
+5. 실적은 고치지 않고 취소 표시 후 새로 등록합니다. 취소하면 공정 합계에서 빠지고, 마감한 작업지시는 취소할 수 없습니다.
+
+이미 만든 DB에는 `db/ddl/07_work_result_request.sql`과 `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
+
 ## 진동·온도 관리한계 알람 (CBM)
 
 1. 고장 징후가 없던 기간의 가동 데이터로 관리한계를 정합니다: `POST /api/equipment-limits/calculate?from=2026-10-16&to=2026-10-19`
@@ -99,16 +111,17 @@ com.minimes
 │  ├─ config      Clock, 스케줄러, WebSocket(STOMP) 공통 설정
 │  └─ error       ErrorCode, BusinessException, 공통 오류 응답, 전역 예외 처리
 ├─ master         기준정보 (조회)
-│  ├─ domain      엔티티: Item, Routing, Equipment, CommonCode ...
+│  ├─ domain      엔티티: Item, Routing, Equipment, CommonCode, Worker ...
 │  ├─ repository  Spring Data JPA
 │  ├─ mapper      MyBatis (BOM 재귀 쿼리) → resources/mapper/master/BomMapper.xml
 │  ├─ service
 │  └─ web         REST 컨트롤러, 응답 DTO
-├─ workorder      작업지시 (생성, 상태 변경)
-│  ├─ domain      WorkOrder(상태 규칙), WorkOrderOperation
+├─ workorder      작업지시 (생성, 상태 변경), 공정 작업과 실적 (POP)
+│  ├─ domain      WorkOrder·WorkOrderOperation(상태 규칙), WorkResult(실적, 취소 표시), Defect(불량 내역)
 │  ├─ repository
-│  ├─ service
-│  └─ web
+│  ├─ mapper      WorkListMapper (작업장의 작업 목록 + 앞 공정 양품) → resources/mapper/workorder/
+│  ├─ service     WorkOrderService, OperationService (시작·실적·완료·취소, requestId 중복 방지)
+│  └─ web         WorkOrderController, OperationController (POP API)
 ├─ production     일별 생산 실적 집계, OEE 조회
 │  ├─ domain      ProductionDaily (production_daily, 복합키)
 │  ├─ repository
@@ -149,6 +162,13 @@ com.minimes
 | POST | `/api/work-orders/{woNo}/start` | 시작 (대기 → 진행) |
 | POST | `/api/work-orders/{woNo}/complete` | 완료 (진행 → 완료) |
 | POST | `/api/work-orders/{woNo}/close` | 마감 (완료 → 마감) |
+| GET | `/api/workers/{workerId}` | 작업자 확인 (POP 로그인) |
+| GET | `/api/work-centers/{wcCode}/operations` | 작업장의 대기·진행 중인 공정 (POP 작업 목록) |
+| POST | `/api/operations/{woOpId}/start` | 공정 시작 (`{"workerId":"W1001"}`) |
+| POST | `/api/operations/{woOpId}/results` | 실적 등록 (`requestId`, `workerId`, `equipCode`, `goodQty`, `defects[]`) |
+| GET | `/api/operations/{woOpId}/results` | 공정의 실적 목록 (취소 포함) |
+| POST | `/api/operations/{woOpId}/complete` | 공정 완료 (마지막 공정이면 작업지시도 완료) |
+| POST | `/api/results/{resultId}/cancel` | 실적 취소 (`{"workerId":"W1001","reason":"수량 오입력"}`) |
 | GET | `/api/monitoring/dashboard` | 설비 현황 (현재 상태, 정지 사유, 센서값, 오늘 OEE) |
 | GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
 | GET | `/api/oee/monthly?month=2025-10` | 설비별 월별 OEE (시간·수량 합산 후 계산) |

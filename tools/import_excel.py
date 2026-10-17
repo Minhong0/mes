@@ -59,6 +59,7 @@ MASTER_TABLES = [
     ("routings", "routing"),
     ("equipment", "equipment"),
     ("inspection_specs", "inspection_spec"),
+    ("workers", "worker"),
 ]
 
 # CSV에서 숫자로 넣을 컬럼. 나머지는 문자열로 넣는다.
@@ -70,7 +71,7 @@ NUMERIC_COLUMNS = {
 # 한글이 들어갈 수 있는 컬럼은 N'...'(NVARCHAR)로 넣는다.
 UNICODE_COLUMNS = {
     "code_name", "group_name", "item_name", "spec", "note", "process_name", "department",
-    "wc_name", "location", "equip_name", "inspect_name",
+    "wc_name", "location", "equip_name", "inspect_name", "worker_name",
 }
 
 

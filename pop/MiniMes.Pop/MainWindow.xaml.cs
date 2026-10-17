@@ -1,19 +1,8 @@
-﻿using System.Text;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 
 namespace MiniMes.Pop;
 
-/// <summary>
-/// Interaction logic for MainWindow.xaml
-/// </summary>
+/// <summary>화면 전환은 MainViewModel.CurrentPage가 맡으므로, 창 자체에는 코드가 없다.</summary>
 public partial class MainWindow : Window
 {
     public MainWindow()
