@@ -17,11 +17,13 @@ C# .NET 8, WPF, MVVM(CommunityToolkit.Mvvm). 작업자가 작업장의 작업을
   ├─ 작업장·설비 선택 (소속 작업장, 그 작업장의 첫 설비가 기본)
   ├─ 작업 목록: 대기·진행 중인 공정 (진행 중이 먼저, 그다음 납기 순)
   ├─ [작업] 탭
-  │    고른 작업: [작업 시작] → 양품·불량 입력 → [실적 등록] (여러 번) → [공정 완료]
+  │    고른 작업: [작업 시작] → 양품·불량 입력 → 투입 LOT 확인 → [실적 등록] (여러 번) → [공정 완료]
   │    등록한 실적은 [취소]할 수 있다 (사유 입력, 취소 표시만 하고 지우지 않음)
   └─ [설비 정지] 탭 (머리에 미확인 정지 수)
        고른 설비의 최근 정지 10건 → 정지를 고르고 대분류·소분류·메모 → [사유 저장]
 ```
+
+투입 LOT: 수량(양품 + 불량)을 넣으면 먼저 들어온 LOT부터 필요한 만큼 자동으로 체크됩니다. 다른 LOT을 썼으면 체크를 바꿉니다. 모자라면 부족 수량이 빨갛게 보이고 등록할 수 없습니다. 등록하면 양품으로 만든 LOT 번호가 나옵니다.
 
 등록한 불량은 서버의 일별 집계에 들어가 OEE 품질이 됩니다. 확정한 정지 사유는 모니터링 화면과 정지 사유 파레토에 바로 나옵니다.
 
@@ -40,7 +42,7 @@ C# .NET 8, WPF, MVVM(CommunityToolkit.Mvvm). 작업자가 작업장의 작업을
 | 폴더 | 내용 |
 | --- | --- |
 | `Api/` | `IMesApi`(화면이 쓰는 서버 기능), `MesApiClient`(HttpClient 구현), 요청·응답 record |
-| `ViewModels/` | `MainViewModel`(화면 전환), `LoginViewModel`, `WorkViewModel`, `DowntimeViewModel`(설비 정지 탭), `DefectEntry`, `IDialogService` |
+| `ViewModels/` | `MainViewModel`(화면 전환), `LoginViewModel`, `WorkViewModel`, `DowntimeViewModel`(설비 정지 탭), `InputLotGroup`(투입 LOT), `DefectEntry`, `IDialogService` |
 | `Views/` | `LoginView`, `WorkView`, `DowntimeView`, 입력 창, `WpfDialogService` |
 | `Storage/` | `IPendingReportStore`, `FilePendingReportStore` (보내지 못한 실적을 단말 파일에 보관) |
 

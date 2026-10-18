@@ -21,7 +21,9 @@ public enum ErrorCode {
     WORKER_NOT_FOUND(HttpStatus.NOT_FOUND, "작업자를 찾을 수 없습니다."),
     OPERATION_NOT_FOUND(HttpStatus.NOT_FOUND, "공정 작업을 찾을 수 없습니다."),
     RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "실적을 찾을 수 없습니다."),
-    DOWNTIME_NOT_FOUND(HttpStatus.NOT_FOUND, "정지 기록을 찾을 수 없습니다.");
+    DOWNTIME_NOT_FOUND(HttpStatus.NOT_FOUND, "정지 기록을 찾을 수 없습니다."),
+    LOT_NOT_FOUND(HttpStatus.NOT_FOUND, "LOT을 찾을 수 없습니다."),
+    LOT_IN_USE(HttpStatus.CONFLICT, "이미 다음 공정에 투입된 LOT입니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

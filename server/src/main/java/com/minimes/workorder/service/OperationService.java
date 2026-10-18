@@ -2,6 +2,10 @@ package com.minimes.workorder.service;
 
 import com.minimes.common.error.BusinessException;
 import com.minimes.common.error.ErrorCode;
+import com.minimes.lot.service.LotInput;
+import com.minimes.lot.service.LotService;
+import com.minimes.lot.service.LotService.InputCandidates;
+import com.minimes.lot.service.LotService.InputPlan;
 import com.minimes.master.domain.CommonCodeId;
 import com.minimes.master.domain.Equipment;
 import com.minimes.master.repository.CommonCodeRepository;
@@ -41,6 +45,7 @@ public class OperationService {
     private final EquipmentRepository equipmentRepository;
     private final CommonCodeRepository commonCodeRepository;
     private final MasterQueryService masterQueryService;
+    private final LotService lotService;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -59,6 +64,7 @@ public class OperationService {
     /**
      * 실적 등록. 같은 requestId가 이미 있으면 새로 저장하지 않고 그때 저장한 실적을 돌려준다.
      * POP가 응답을 받지 못해 다시 보낸 경우다. 오류로 돌려주면 POP는 저장됐는지 알 수 없다.
+     * 투입 LOT을 줄이고 양품으로 산출 LOT을 만드는 일도 같은 트랜잭션에서 한다. 하나라도 틀리면 실적도 저장되지 않는다.
      */
     public WorkResult report(long woOpId, ReportCommand command) {
         Optional<WorkResult> already = resultRepository.findByRequestId(command.requestId());
@@ -78,7 +84,9 @@ public class OperationService {
         WorkResult result = WorkResult.fromPop(command.requestId(), woOpId, command.equipCode(), command.workerId(),
                 command.goodQty(), command.defects(), startedAt, now);
         op.addResult(result.getGoodQty(), result.getDefectQty());
-        resultRepository.save(result);
+        InputPlan plan = lotService.planInputs(op, result.getGoodQty() + result.getDefectQty(), command.inputs());
+        resultRepository.save(result);   // IDENTITY라 여기서 INSERT하고 result_id를 받는다. LOT 이력이 이 번호를 쓴다
+        lotService.record(plan, result);
         publishChanged(result);
         return result;
     }
@@ -90,16 +98,24 @@ public class OperationService {
         return op;
     }
 
-    /** 실적 취소: 취소 표시를 하고 공정 합계에서 뺀다. */
+    /** 실적 취소: 취소 표시를 하고 공정 합계에서 뺀다. 만든 LOT은 폐기하고 투입한 LOT에는 수량을 돌려준다. */
     public WorkResult cancel(long resultId, String workerId, String reason) {
         masterQueryService.getActiveWorker(workerId);
         WorkResult result = resultRepository.findWithDefectsByResultId(resultId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESULT_NOT_FOUND, "실적을 찾을 수 없습니다: " + resultId));
         WorkOrderOperation op = getOperation(result.getWoOpId());
-        result.cancel(workerId, reason, LocalDateTime.now(clock));
+        LocalDateTime now = LocalDateTime.now(clock);
+        result.cancel(workerId, reason, now);
         op.removeResult(result.getGoodQty(), result.getDefectQty());
+        lotService.cancel(result, workerId, now);
         publishChanged(result);
         return result;
+    }
+
+    /** 이 공정에 투입할 품목과 쓸 수 있는 LOT (POP 투입 LOT 선택) */
+    @Transactional(readOnly = true)
+    public List<InputCandidates> inputCandidates(long woOpId) {
+        return lotService.inputCandidates(getOperation(woOpId));
     }
 
     @Transactional(readOnly = true)
@@ -139,8 +155,8 @@ public class OperationService {
         }
     }
 
-    /** 실적 등록 요청 */
+    /** 실적 등록 요청. inputs: 투입한 LOT과 수량 */
     public record ReportCommand(String requestId, String workerId, String equipCode, int goodQty,
-                                List<DefectLine> defects) {
+                                List<DefectLine> defects, List<LotInput> inputs) {
     }
 }

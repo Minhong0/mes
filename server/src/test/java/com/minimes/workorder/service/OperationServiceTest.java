@@ -40,6 +40,7 @@ import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * POP 흐름: 작업지시(공정 3개: WC-100 → WC-200 → WC-300)를 만들고 시작 → 실적 → 완료 → 취소를 해 본다.
+ * 이 테스트의 기준정보에는 BOM이 없어 첫 공정에 투입할 LOT이 없다. LOT 투입·산출은 LotFlowTest가 본다.
  * 시계는 테스트가 앞으로 돌릴 수 있게 만들어, 실적마다 시각이 다르게 남는지 확인한다.
  */
 @SpringBootTest
@@ -116,7 +117,7 @@ class OperationServiceTest {
     }
 
     ReportCommand report(int good, DefectLine... defects) {
-        return new ReportCommand(UUID.randomUUID().toString(), "W1001", "CNC01", good, List.of(defects));
+        return new ReportCommand(UUID.randomUUID().toString(), "W1001", "CNC01", good, List.of(defects), List.of());
     }
 
     void expectError(ErrorCode code, ThrowingCallable call) {
@@ -184,9 +185,9 @@ class OperationServiceTest {
         expectError(ErrorCode.INVALID_INPUT, () -> operationService.report(op10, report(0)));
         expectError(ErrorCode.INVALID_INPUT, () -> operationService.report(op10, report(1, new DefectLine("BURR", 1))));
         expectError(ErrorCode.INVALID_INPUT, () -> operationService.report(op10,
-                new ReportCommand(UUID.randomUUID().toString(), "W1001", "CNC03", 1, List.of())));   // CNC03은 WC-200
+                new ReportCommand(UUID.randomUUID().toString(), "W1001", "CNC03", 1, List.of(), List.of())));   // CNC03은 WC-200
         expectError(ErrorCode.WORKER_NOT_FOUND, () -> operationService.report(op10,
-                new ReportCommand(UUID.randomUUID().toString(), "W0000", "CNC01", 1, List.of())));
+                new ReportCommand(UUID.randomUUID().toString(), "W0000", "CNC01", 1, List.of(), List.of())));
         expectError(ErrorCode.WORKER_NOT_FOUND, () -> operationService.start(op20, "W1099"));
     }
 
@@ -251,7 +252,7 @@ class OperationServiceTest {
         ReportCommand command = report(5, new DefectLine("OVERSIZE", 1));
         WorkResult result = operationService.report(op10, command);
         operationService.report(op10, command);   // 다시 보낸 요청
-        operationService.report(op10, new ReportCommand(UUID.randomUUID().toString(), "W1001", null, 2, List.of()));
+        operationService.report(op10, new ReportCommand(UUID.randomUUID().toString(), "W1001", null, 2, List.of(), List.of()));
         operationService.cancel(result.getResultId(), "W1001", "수량 오입력");
 
         assertThat(events.stream(WorkResultChangedEvent.class))

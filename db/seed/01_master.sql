@@ -57,17 +57,17 @@ INSERT INTO common_code (group_code, code, code_name, parent_code, sort_order) V
     ('DEFECT_TYPE', 'LOW_HARDNESS', N'경도 미달', NULL, 3);
 
 -- item: 10건
-INSERT INTO item (item_code, item_name, item_type, spec, unit, note) VALUES
-    ('FG-SFT-100', N'변속기 메인 샤프트 ASSY', 'FG', N'Ø35×L280mm', 'EA', N'최종 출하품'),
-    ('SF-SFT-010', N'1차 가공 샤프트', 'SF', N'Ø38×L285mm', 'EA', N'OP-10 산출물'),
-    ('SF-SFT-020', N'2차 정밀 샤프트', 'SF', N'Ø35.5×L282mm', 'EA', N'OP-20 산출물'),
-    ('SF-SFT-030', N'열처리 샤프트', 'SF', N'Ø35.5×L282mm', 'EA', N'OP-30 산출물'),
-    ('SF-SFT-040', N'연삭 샤프트', 'SF', N'Ø35×L280mm', 'EA', N'OP-40 산출물'),
-    ('RM-SCM-001', N'SCM440 환봉', 'RM', N'Ø40×L300mm', 'EA', N'크롬몰리브덴강'),
-    ('RM-KEY-001', N'키홈 핀', 'RM', N'Ø5×L15mm', 'EA', N'SUS304'),
-    ('RM-OIL-001', N'절삭유', 'RM', NULL, 'L', N'수용성 소모품'),
-    ('RM-GRD-001', N'연삭석', 'RM', N'Ø200mm', 'EA', N'소모성 공구 (약 200개 가공)'),
-    ('RM-PKG-001', N'포장 트레이', 'RM', N'20구', 'EA', N'PP 소재');
+INSERT INTO item (item_code, item_name, item_type, spec, unit, note, lot_yn) VALUES
+    ('FG-SFT-100', N'변속기 메인 샤프트 ASSY', 'FG', N'Ø35×L280mm', 'EA', N'최종 출하품', 'Y'),
+    ('SF-SFT-010', N'1차 가공 샤프트', 'SF', N'Ø38×L285mm', 'EA', N'OP-10 산출물', 'Y'),
+    ('SF-SFT-020', N'2차 정밀 샤프트', 'SF', N'Ø35.5×L282mm', 'EA', N'OP-20 산출물', 'Y'),
+    ('SF-SFT-030', N'열처리 샤프트', 'SF', N'Ø35.5×L282mm', 'EA', N'OP-30 산출물', 'Y'),
+    ('SF-SFT-040', N'연삭 샤프트', 'SF', N'Ø35×L280mm', 'EA', N'OP-40 산출물', 'Y'),
+    ('RM-SCM-001', N'SCM440 환봉', 'RM', N'Ø40×L300mm', 'EA', N'크롬몰리브덴강', 'Y'),
+    ('RM-KEY-001', N'키홈 핀', 'RM', N'Ø5×L15mm', 'EA', N'SUS304', 'Y'),
+    ('RM-OIL-001', N'절삭유', 'RM', NULL, 'L', N'수용성 소모품', 'N'),
+    ('RM-GRD-001', N'연삭석', 'RM', N'Ø200mm', 'EA', N'소모성 공구 (약 200개 가공)', 'N'),
+    ('RM-PKG-001', N'포장 트레이', 'RM', N'20구', 'EA', N'PP 소재', 'N');
 
 -- process: 7건
 INSERT INTO process (process_code, process_name, process_name_en, department) VALUES

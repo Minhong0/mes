@@ -22,8 +22,10 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 import static org.hamcrest.Matchers.closeTo;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -295,8 +297,9 @@ class MssqlIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RUN"));
 
+        String bar = receiveBar(10);
         String report = "{\"requestId\":\"it-req-1\",\"workerId\":\"W1001\",\"equipCode\":\"CNC01\",\"goodQty\":8,"
-                + "\"defects\":[{\"defectType\":\"OVERSIZE\",\"qty\":2}]}";
+                + "\"defects\":[{\"defectType\":\"OVERSIZE\",\"qty\":2}],\"inputs\":[{\"lotNo\":\"" + bar + "\",\"qty\":10}]}";
         String first = mockMvc.perform(post("/api/operations/{id}/results", op10).contentType(MediaType.APPLICATION_JSON).content(report))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.defects[0].defectType").value("OVERSIZE"))
@@ -386,5 +389,125 @@ class MssqlIntegrationTest {
     private void sendCnc02(String collectedAt, int cycleCount, String status, String dtCat, String dtSub) {
         equipmentDataService.save(new EquipmentMessage("CNC02-IT-" + collectedAt, "CNC02", OffsetDateTime.parse(collectedAt),
                 cycleCount, status, new BigDecimal("1.2"), new BigDecimal("35.0"), dtCat, dtSub));
+    }
+
+    @Test
+    @DisplayName("LOT 추적 (재귀 CTE, UPDLOCK): 환봉 입고 → 선삭 → 밀링 → 열처리 Batch, 역방향·정방향 추적, 취소한 실적은 빠진다")
+    void lotTrace() throws Exception {
+        mockMvc.perform(post("/api/lots/receive").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemCode\":\"RM-OIL-001\",\"qty\":20,\"workerId\":\"W1001\"}"))
+                .andExpect(status().isBadRequest());   // 절삭유는 LOT 관리 품목이 아니다
+        String barA = receiveBar(10);
+        String barB = receiveBar(10);
+
+        String created = mockMvc.perform(post("/api/work-orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemCode\":\"FG-SFT-100\",\"planQty\":10}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        int op10 = JsonPath.read(created, "$.operations[0].woOpId");
+        int op20 = JsonPath.read(created, "$.operations[1].woOpId");
+        int op30 = JsonPath.read(created, "$.operations[2].woOpId");
+
+        startOperation(op10);
+        String t1 = reportLot(op10, 5, 0, barA, 5);
+        String t2 = reportLot(op10, 4, 1, barA, 3, barB, 2);
+
+        mockMvc.perform(get("/api/operations/{id}/input-lots", op20))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].itemCode").value("SF-SFT-010"))
+                .andExpect(jsonPath("$[0].fromProcess").value("OP-10"))
+                .andExpect(jsonPath("$[0].lots[0].lotNo").value(t1))
+                .andExpect(jsonPath("$[0].lots[1].lotNo").value(t2));
+
+        startOperation(op20);
+        String m1 = reportLot(op20, 5, 0, t1, 5);
+        String m2 = reportLot(op20, 4, 0, t2, 4);
+        startOperation(op30);
+        String batch = reportLot(op30, 9, 0, m1, 5, m2, 4);
+
+        // 역방향: 열처리 LOT ← 밀링 2 ← 선삭 2 ← 환봉 (barA는 두 경로로 나온다)
+        mockMvc.perform(get("/api/lots/{lotNo}/trace", batch))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lot.itemCode").value("SF-SFT-030"))
+                .andExpect(jsonPath("$.backward.length()").value(7))
+                .andExpect(jsonPath("$.backward[0].lotNo").value(m1))
+                .andExpect(jsonPath("$.backward[0].traceLevel").value(1))
+                .andExpect(jsonPath("$.backward[0].processName").value("CNC 밀링"))
+                .andExpect(jsonPath("$.backward[1].lotNo").value(t1))
+                .andExpect(jsonPath("$.backward[2].lotNo").value(barA))
+                .andExpect(jsonPath("$.backward[2].traceLevel").value(3))
+                .andExpect(jsonPath("$.backward[2].itemName").value("SCM440 환봉"))
+                .andExpect(jsonPath("$.backward[?(@.lotNo == '" + barB + "')].linkQty").value(hasItem(2.0)))
+                .andExpect(jsonPath("$.forward.length()").value(0));
+
+        // 실적 하나를 더 하고 취소: 계보 줄은 남지만 추적에서는 빠진다
+        String extra = mockMvc.perform(post("/api/operations/{id}/results", op10).contentType(MediaType.APPLICATION_JSON)
+                        .content(reportJson(1, 0, barB, 1)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        int extraId = JsonPath.read(extra, "$.resultId");
+        mockMvc.perform(post("/api/results/{id}/cancel", extraId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W1001\",\"reason\":\"수량 오입력\"}"))
+                .andExpect(status().isOk());
+
+        // 정방향: 환봉 barB → 선삭 t2 → 밀링 m2 → 열처리 batch
+        mockMvc.perform(get("/api/lots/{lotNo}/trace", barB))
+                .andExpect(jsonPath("$.backward.length()").value(0))
+                .andExpect(jsonPath("$.forward.length()").value(3))
+                .andExpect(jsonPath("$.forward[0].lotNo").value(t2))
+                .andExpect(jsonPath("$.forward[1].lotNo").value(m2))
+                .andExpect(jsonPath("$.forward[2].lotNo").value(batch))
+                .andExpect(jsonPath("$.forward[2].status").value("ACTIVE"));
+
+        // 다음 공정에 쓴 LOT의 실적은 취소할 수 없다
+        String results = mockMvc.perform(get("/api/operations/{id}/results", op20))
+                .andExpect(jsonPath("$[0].outputLotNo").value(m2))
+                .andExpect(jsonPath("$[0].inputs[0].lotNo").value(t2))
+                .andReturn().getResponse().getContentAsString();
+        int m2Result = JsonPath.read(results, "$[0].resultId");
+        mockMvc.perform(post("/api/results/{id}/cancel", m2Result).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W1001\",\"reason\":\"수량 오입력\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LOT_IN_USE"));
+
+        mockMvc.perform(get("/api/lots/{lotNo}", barB))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lot.qty").value(8.0))
+                .andExpect(jsonPath("$.history[*].eventType").value(contains("RECEIVE", "CONSUME", "CONSUME", "CANCEL")));
+    }
+
+    private String receiveBar(int qty) throws Exception {
+        String body = mockMvc.perform(post("/api/lots/receive").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemCode\":\"RM-SCM-001\",\"qty\":" + qty + ",\"supplierLotNo\":\"SUP-IT\",\"workerId\":\"W1001\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(body, "$.lotNo");
+    }
+
+    private void startOperation(int woOpId) throws Exception {
+        mockMvc.perform(post("/api/operations/{id}/start", woOpId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W1001\"}"))
+                .andExpect(status().isOk());
+    }
+
+    /** 실적을 등록하고 만든 LOT 번호를 돌려준다. lotsAndQty: LOT 번호, 수량, LOT 번호, 수량 ... */
+    private String reportLot(int woOpId, int good, int defect, Object... lotsAndQty) throws Exception {
+        String body = mockMvc.perform(post("/api/operations/{id}/results", woOpId).contentType(MediaType.APPLICATION_JSON)
+                        .content(reportJson(good, defect, lotsAndQty)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(body, "$.outputLotNo");
+    }
+
+    private static String reportJson(int good, int defect, Object... lotsAndQty) {
+        StringBuilder inputs = new StringBuilder();
+        for (int i = 0; i < lotsAndQty.length; i += 2) {
+            inputs.append(i == 0 ? "" : ",").append("{\"lotNo\":\"%s\",\"qty\":%s}".formatted(lotsAndQty[i], lotsAndQty[i + 1]));
+        }
+        String defects = defect == 0 ? "" : "{\"defectType\":\"OVERSIZE\",\"qty\":%d}".formatted(defect);
+        return "{\"requestId\":\"%s\",\"workerId\":\"W1001\",\"goodQty\":%d,\"defects\":[%s],\"inputs\":[%s]}"
+                .formatted(UUID.randomUUID(), good, defects, inputs);
     }
 }

@@ -185,6 +185,64 @@
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
 
+                                    <!-- 투입 LOT: 수량을 바꾸면 먼저 들어온 LOT부터 자동으로 체크된다. 다른 LOT을 쓰면 체크를 바꾼다 -->
+                                    <StackPanel Visibility="{Binding HasInputGroups, Converter={StaticResource BoolToVisibility}}"
+                                                IsEnabled="{Binding IsInputEnabled}">
+                                        <TextBlock Text="투입 LOT" FontWeight="Bold" Margin="0,16,0,4" />
+                                        <ItemsControl ItemsSource="{Binding InputGroups}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,0,0,8">
+                                                        <DockPanel>
+                                                            <TextBlock DockPanel.Dock="Right" Text="{Binding StatusText}" FontSize="15" VerticalAlignment="Center">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding IsSatisfied}" Value="False">
+                                                                                <Setter Property="Foreground" Value="{StaticResource Down}" />
+                                                                                <Setter Property="FontWeight" Value="SemiBold" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                            </TextBlock>
+                                                            <TextBlock>
+                                                                <Run Text="{Binding ItemName, Mode=OneWay}" FontWeight="SemiBold" />
+                                                                <Run Text="{Binding SourceText, Mode=OneWay}" Foreground="{StaticResource Muted}" FontSize="14" />
+                                                            </TextBlock>
+                                                        </DockPanel>
+                                                        <TextBlock Text="쓸 수 있는 LOT이 없습니다." Foreground="{StaticResource Down}">
+                                                            <TextBlock.Visibility>
+                                                                <Binding Path="Lots.Count">
+                                                                    <Binding.Converter>
+                                                                        <x:Static Member="views:ZeroToVisibleConverter.Instance" />
+                                                                    </Binding.Converter>
+                                                                </Binding>
+                                                            </TextBlock.Visibility>
+                                                        </TextBlock>
+                                                        <ItemsControl ItemsSource="{Binding Lots}">
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate>
+                                                                    <CheckBox IsChecked="{Binding IsSelected}" MinHeight="36" Margin="0,2"
+                                                                              VerticalContentAlignment="Center" FontSize="16">
+                                                                        <TextBlock>
+                                                                            <Run Text="{Binding LotNo, Mode=OneWay}" FontWeight="SemiBold" />
+                                                                            <Run Text="  남은" Foreground="{StaticResource Muted}" />
+                                                                            <Run Text="{Binding Qty, Mode=OneWay, StringFormat=0.###}" />
+                                                                            <Run Text="  → 투입" Foreground="{StaticResource Muted}" />
+                                                                            <Run Text="{Binding UseQty, Mode=OneWay, StringFormat=0.###}" FontWeight="Bold" Foreground="{StaticResource Accent}" />
+                                                                        </TextBlock>
+                                                                    </CheckBox>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+
                                     <!-- 보내지 못한 실적이 있을 때만 보인다 -->
                                     <Border Visibility="{Binding HasPendingReport, Converter={StaticResource BoolToVisibility}}"
                                             Background="#FFF6E5" BorderBrush="{StaticResource Warn}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,8,0,0">
@@ -253,6 +311,18 @@
                                                                 <Run Text="{Binding DefectQty, Mode=OneWay}" />
                                                                 <Run Text="  " />
                                                                 <Run Text="{Binding EquipCode, Mode=OneWay}" />
+                                                            </TextBlock>
+                                                            <!-- 양품으로 만든 LOT (모두 불량이거나 LOT 추적 전의 실적이면 없음) -->
+                                                            <TextBlock FontSize="14" Text="{Binding OutputLotNo, StringFormat=→ LOT {0}}">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding OutputLotNo}" Value="{x:Null}">
+                                                                                <Setter Property="Visibility" Value="Collapsed" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
                                                             </TextBlock>
                                                             <TextBlock Style="{StaticResource MutedText}"
                                                                        Visibility="{Binding Cancelled, Converter={StaticResource BoolToVisibility}}">

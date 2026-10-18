@@ -18,9 +18,11 @@ public final class MasterResponses {
     private MasterResponses() {
     }
 
-    public record ItemResponse(String itemCode, String itemName, String itemType, String spec, String unit) {
+    public record ItemResponse(String itemCode, String itemName, String itemType, String spec, String unit,
+                               boolean lotTracked) {
         public static ItemResponse from(Item i) {
-            return new ItemResponse(i.getItemCode(), i.getItemName(), i.getItemType().name(), i.getSpec(), i.getUnit());
+            return new ItemResponse(i.getItemCode(), i.getItemName(), i.getItemType().name(), i.getSpec(), i.getUnit(),
+                    i.isLotTracked());
         }
     }
 

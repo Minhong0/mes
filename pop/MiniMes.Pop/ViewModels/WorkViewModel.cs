@@ -7,7 +7,7 @@ using MiniMes.Pop.Storage;
 namespace MiniMes.Pop.ViewModels;
 
 /// <summary>
-/// 작업 화면: 작업장의 작업 목록 → 공정 시작 → 실적(양품·불량) 등록 → 공정 완료, 그리고 실적 취소.
+/// 작업 화면: 작업장의 작업 목록 → 공정 시작 → 실적(양품·불량, 투입 LOT) 등록 → 공정 완료, 그리고 실적 취소.
 ///
 /// 실적 전송이 통신 오류로 실패하면, 보낸 요청(같은 RequestId)을 PendingReport에 잡아 두고 입력을 잠근다.
 /// 서버에 저장됐는지 알 수 없으므로 새로 입력받지 않고 "같은 요청"을 다시 보내게 한다.
@@ -66,6 +66,9 @@ public partial class WorkViewModel : ObservableObject
 
     public ObservableCollection<DefectEntry> Defects { get; } = [];
 
+    /// <summary>고른 공정에 투입할 품목과 LOT. 실적 수량을 바꾸면 먼저 들어온 LOT부터 자동으로 고른다</summary>
+    public ObservableCollection<InputLotGroup> InputGroups { get; } = [];
+
     [ObservableProperty]
     private string? _selectedWorkCenter;
 
@@ -100,6 +103,11 @@ public partial class WorkViewModel : ObservableObject
     public int DefectTotal => Defects.Sum(d => d.Qty);
 
     public int TotalQty => GoodQty + DefectTotal;
+
+    public bool HasInputGroups => InputGroups.Count > 0;
+
+    /// <summary>품목마다 필요한 만큼 LOT을 담았는가</summary>
+    public bool InputsReady => InputGroups.All(g => g.IsSatisfied);
 
     public bool HasPendingReport => PendingReport != null;
 
@@ -243,7 +251,7 @@ public partial class WorkViewModel : ObservableObject
 
     // 보내지 못한 실적은 고른 작업과 상관없이 원래 공정으로 다시 보낸다
     private bool CanReport() =>
-        !IsBusy && (PendingReport != null || (SelectedOperation?.Status == StatusRun && TotalQty > 0));
+        !IsBusy && (PendingReport != null || (SelectedOperation?.Status == StatusRun && TotalQty > 0 && InputsReady));
 
     /// <summary>실적 등록. 보내지 못한 실적이 있으면 새로 만들지 않고 그 요청을 다시 보낸다.</summary>
     [RelayCommand(CanExecute = nameof(CanReport))]
@@ -261,7 +269,8 @@ public partial class WorkViewModel : ObservableObject
             Worker.WorkerId,
             SelectedEquipment?.EquipCode,
             GoodQty,
-            Defects.Where(d => d.Qty > 0).Select(d => new DefectLine(d.Code, d.Qty)).ToList());
+            Defects.Where(d => d.Qty > 0).Select(d => new DefectLine(d.Code, d.Qty)).ToList(),
+            InputGroups.SelectMany(g => g.ToInputs()).ToList());
         _pendingWoOpId = op.WoOpId;
         await SendReportAsync(op.WoOpId, op.WoNo, op.ProcessName, request, "실적");
     }
@@ -281,7 +290,8 @@ public partial class WorkViewModel : ObservableObject
             _pendingStore.Clear(Worker.WorkerId);
             PendingReport = null;
             ResetInputs();
-            ShowInfo($"{label}을 등록했습니다: 양품 {result.GoodQty}, 불량 {result.DefectQty}");
+            ShowInfo($"{label}을 등록했습니다: 양품 {result.GoodQty}, 불량 {result.DefectQty}"
+                     + (result.OutputLotNo == null ? "" : $" → LOT {result.OutputLotNo}"));
             await RefreshAsync();
         }
         catch (MesConnectionException e)
@@ -374,6 +384,7 @@ public partial class WorkViewModel : ObservableObject
         _logout();
     }
 
+    /// <summary>고른 공정의 실적 목록과 투입할 LOT을 읽는다.</summary>
     private async Task LoadResultsAsync()
     {
         // 선택이 빨리 바뀌면 조회가 겹친다. 마지막에 시작한 조회의 결과만 화면에 넣는다.
@@ -382,11 +393,13 @@ public partial class WorkViewModel : ObservableObject
         if (op == null)
         {
             Results.Clear();
+            SetInputGroups([]);
             return;
         }
         try
         {
             var results = await _api.GetResultsAsync(op.WoOpId);
+            var inputs = await _api.GetInputLotsAsync(op.WoOpId);
             if (version != _resultsVersion)
             {
                 return;
@@ -396,6 +409,7 @@ public partial class WorkViewModel : ObservableObject
             {
                 Results.Add(r);
             }
+            SetInputGroups(inputs);
         }
         catch (Exception e) when (e is MesApiException or MesConnectionException)
         {
@@ -421,6 +435,30 @@ public partial class WorkViewModel : ObservableObject
         }
     }
 
+    private void SetInputGroups(IReadOnlyList<InputLots> inputs)
+    {
+        InputGroups.Clear();
+        foreach (var input in inputs)
+        {
+            var group = new InputLotGroup(input, () => ReportCommand.NotifyCanExecuteChanged());
+            group.SetUnits(TotalQty);
+            InputGroups.Add(group);
+        }
+        OnPropertyChanged(nameof(HasInputGroups));
+        ReportCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>실적 수량이 바뀌면 투입 LOT을 먼저 들어온 것부터 다시 고른다.</summary>
+    private void ReselectInputs()
+    {
+        foreach (var group in InputGroups)
+        {
+            group.SetUnits(TotalQty);
+        }
+    }
+
+    partial void OnGoodQtyChanged(int value) => ReselectInputs();
+
     private void ResetInputs()
     {
         if (PendingReport != null)
@@ -438,6 +476,7 @@ public partial class WorkViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(DefectTotal));
         OnPropertyChanged(nameof(TotalQty));
+        ReselectInputs();
         ReportCommand.NotifyCanExecuteChanged();
     }
 

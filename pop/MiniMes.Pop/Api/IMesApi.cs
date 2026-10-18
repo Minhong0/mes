@@ -20,6 +20,9 @@ public interface IMesApi
 
     Task<OperationState> StartAsync(long woOpId, string workerId);
 
+    /// <summary>공정에 투입할 품목마다 쓸 수 있는 LOT</summary>
+    Task<IReadOnlyList<InputLots>> GetInputLotsAsync(long woOpId);
+
     Task<WorkResult> ReportAsync(long woOpId, ReportRequest request);
 
     Task<OperationState> CompleteAsync(long woOpId, string workerId);

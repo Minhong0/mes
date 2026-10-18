@@ -7,6 +7,7 @@ namespace MiniMes.Pop.Tests;
 /// <summary>
 /// 서버 없이 화면 로직을 시험하는 가짜 API. 작업장 WC-100에 공정 하나(WO-1 선삭)가 있다.
 /// 실제 서버처럼 requestId가 같은 실적은 한 번만 저장한다. CNC01에는 정지 두 건(하나는 정지 중)이 있다.
+/// 투입할 LOT은 기본으로 없다 (Inputs를 채우면 그 공정에 투입할 품목과 LOT이 생긴다).
 /// </summary>
 public sealed class FakeMesApi : IMesApi
 {
@@ -58,6 +59,17 @@ public sealed class FakeMesApi : IMesApi
         return Task.FromResult(new OperationState(woOpId, 10, "OP-10", "WC-100", "RUN", 0, 0));
     }
 
+    public List<InputLots> Inputs { get; set; } = [];
+
+    /// <summary>환봉 LOT 두 개(3개 남음, 10개 남음)를 선입선출 순서로</summary>
+    public static InputLots BarStock() => new("RM-SCM-001", "SCM440 환봉", 1, null,
+    [
+        new LotStock("RM-SCM-001-261017-001", 3, new DateTime(2026, 10, 17, 8, 0, 0)),
+        new LotStock("RM-SCM-001-261017-002", 10, new DateTime(2026, 10, 17, 8, 30, 0)),
+    ]);
+
+    public Task<IReadOnlyList<InputLots>> GetInputLotsAsync(long woOpId) => Task.FromResult<IReadOnlyList<InputLots>>(Inputs.ToList());
+
     public Task<WorkResult> ReportAsync(long woOpId, ReportRequest request)
     {
         Sent.Add(request);
@@ -88,7 +100,8 @@ public sealed class FakeMesApi : IMesApi
         }
         var defects = request.Defects.Sum(d => d.Qty);
         var result = new WorkResult(Saved.Count + 1, 11, request.EquipCode, request.WorkerId, DateTime.Today, DateTime.Now,
-            request.GoodQty, defects, false, null, request.Defects);
+            request.GoodQty, defects, false, null, request.Defects,
+            request.GoodQty > 0 ? $"SF-SFT-010-261017-{Saved.Count + 1:000}" : null, request.Inputs);
         Saved.Add(result);
         _byRequest[request.RequestId] = result;
         Operation = Operation with { GoodQty = Operation.GoodQty + request.GoodQty, DefectQty = Operation.DefectQty + defects };

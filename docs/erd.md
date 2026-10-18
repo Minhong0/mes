@@ -23,6 +23,7 @@ erDiagram
         varchar item_code PK
         nvarchar item_name
         varchar item_type "FG, SF, RM"
+        char lot_yn "LOT 관리 여부"
     }
     BOM {
         int bom_id PK
@@ -66,6 +67,7 @@ erDiagram
     LOT ||--o{ LOT_GENEALOGY : "투입"
     LOT ||--o{ LOT_GENEALOGY : "산출"
     WORK_RESULT ||--o{ LOT_GENEALOGY : ""
+    WORK_RESULT ||--o{ LOT_HISTORY : ""
     LOT ||--o{ LOT_HISTORY : "이벤트"
     LOT ||--o{ INSPECTION_RESULT : "검사"
     INSPECTION_SPEC ||--o{ INSPECTION_RESULT : "규격"
@@ -92,16 +94,27 @@ erDiagram
         bit cancelled
     }
     LOT {
-        varchar lot_no PK
+        varchar lot_no PK "품번-yyMMdd-001"
         varchar item_code FK
-        decimal qty
-        varchar status
+        decimal qty "남은 수량"
+        decimal initial_qty
+        varchar status "ACTIVE, HOLD, CONSUMED, SHIPPED, SCRAPPED"
+        varchar wo_no FK "원자재는 NULL"
+        varchar last_process FK "만든 공정"
     }
     LOT_GENEALOGY {
         bigint genealogy_id PK
         varchar input_lot_no FK
         varchar output_lot_no FK
+        decimal qty "투입 수량"
+        bigint result_id FK
+    }
+    LOT_HISTORY {
+        bigint history_id PK
+        varchar lot_no FK
+        varchar event_type "RECEIVE, PRODUCE, CONSUME, CANCEL ..."
         decimal qty
+        bigint result_id FK "만든 실적"
     }
 ```
 

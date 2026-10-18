@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.minimes.lot.mapper.LotTraceMapper">
+
+    <!--
+        LOT 추적: lot_genealogy(투입 → 산출)를 재귀 CTE로 따라간다. BOM 전개(BomMapper.xml)와 같은 모양이다.
+        1) links: 취소한 실적이 만든 줄을 뺀 계보. 계보는 지우지 않으므로 여기서 거른다.
+           (재귀 부분 안에서는 LEFT JOIN을 쓸 수 없어 먼저 따로 만든다)
+        2) 앵커: 시작 LOT과 바로 이어진 LOT들 (Level 1)
+        3) 재귀: 방금 찾은 LOT과 이어진 LOT을 찾아 Level을 1 올린다. 더 이어진 것이 없으면 멈춘다.
+        sort_path는 지나온 LOT 번호를 이은 경로로, 트리 모양 순서로 정렬하는 데 쓴다.
+        한 LOT이 두 경로로 이어지면(예: 같은 환봉 LOT이 두 가공 LOT에 들어가 한 열처리 Batch로 합쳐짐) 트리에 두 번 나온다.
+    -->
+    <sql id="validLinks">
+        links AS (
+            SELECT g.input_lot_no, g.output_lot_no, g.qty, g.result_id, g.linked_at
+            FROM lot_genealogy g
+            LEFT JOIN work_result r ON r.result_id = g.result_id
+            WHERE r.result_id IS NULL OR r.cancelled = 0
+        )
+    </sql>
+
+    <sql id="selectNodes">
+        SELECT
+            t.trace_level,
+            t.parent_lot_no,
+            t.lot_no,
+            l.item_code,
+            i.item_name,
+            i.item_type,
+            l.last_process,
+            p.process_name,
+            t.qty        AS link_qty,
+            l.status,
+            l.wo_no,
+            t.result_id,
+            t.linked_at
+        FROM trace t
+        JOIN lot l ON l.lot_no = t.lot_no
+        JOIN item i ON i.item_code = l.item_code
+        LEFT JOIN process p ON p.process_code = l.last_process
+        ORDER BY t.sort_path
+        OPTION (MAXRECURSION 50)
+    </sql>
+
+    <!-- 역방향: 산출 LOT → 투입 LOT 방향으로 거슬러 올라간다 -->
+    <select id="selectBackward" resultType="com.minimes.lot.mapper.TraceNode">
+        WITH <include refid="validLinks"/>,
+        trace AS (
+            SELECT
+                1                                         AS trace_level,
+                k.output_lot_no                           AS parent_lot_no,
+                k.input_lot_no                            AS lot_no,
+                k.qty,
+                k.result_id,
+                k.linked_at,
+                CAST(k.input_lot_no AS VARCHAR(1000))     AS sort_path
+            FROM links k
+            WHERE k.output_lot_no = #{lotNo}
+
+            UNION ALL
+
+            SELECT
+                t.trace_level + 1,
+                k.output_lot_no,
+                k.input_lot_no,
+                k.qty,
+                k.result_id,
+                k.linked_at,
+                CAST(t.sort_path + '>' + k.input_lot_no AS VARCHAR(1000))
+            FROM trace t
+            JOIN links k ON k.output_lot_no = t.lot_no
+        )
+        <include refid="selectNodes"/>
+    </select>
+
+    <!-- 정방향: 투입 LOT → 산출 LOT 방향으로 따라 내려간다 -->
+    <select id="selectForward" resultType="com.minimes.lot.mapper.TraceNode">
+        WITH <include refid="validLinks"/>,
+        trace AS (
+            SELECT
+                1                                         AS trace_level,
+                k.input_lot_no                            AS parent_lot_no,
+                k.output_lot_no                           AS lot_no,
+                k.qty,
+                k.result_id,
+                k.linked_at,
+                CAST(k.output_lot_no AS VARCHAR(1000))    AS sort_path
+            FROM links k
+            WHERE k.input_lot_no = #{lotNo}
+
+            UNION ALL
+
+            SELECT
+                t.trace_level + 1,
+                k.input_lot_no,
+                k.output_lot_no,
+                k.qty,
+                k.result_id,
+                k.linked_at,
+                CAST(t.sort_path + '>' + k.output_lot_no AS VARCHAR(1000))
+            FROM trace t
+            JOIN links k ON k.input_lot_no = t.lot_no
+        )
+        <include refid="selectNodes"/>
+    </select>
+
+</mapper>

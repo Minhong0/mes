@@ -32,6 +32,9 @@ public sealed class MesApiClient : IMesApi
     public Task<OperationState> StartAsync(long woOpId, string workerId) =>
         PostAsync<OperationState>($"api/operations/{woOpId}/start", new { workerId });
 
+    public Task<IReadOnlyList<InputLots>> GetInputLotsAsync(long woOpId) =>
+        GetAsync<IReadOnlyList<InputLots>>($"api/operations/{woOpId}/input-lots");
+
     public Task<WorkResult> ReportAsync(long woOpId, ReportRequest request) =>
         PostAsync<WorkResult>($"api/operations/{woOpId}/results", request);
 

@@ -39,7 +39,23 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
 6. 설비를 적은 실적을 등록·취소하면 그날 일별 집계를 다시 합니다 (불량 수량 → OEE 품질).
 7. 정지 사유: `GET /api/equipment/{equipCode}/downtimes`로 설비가 남긴 최근 정지를 받고, `PUT /api/downtimes/{downtimeId}/reason`으로 작업자가 대분류·소분류를 확정합니다. 소분류는 그 대분류에 속해야 하고(공통코드 `parent_code`), 확정한 작업자와 시각(`reason_at`)이 남습니다. 모니터링 화면과 정지 사유 파레토는 확정한 사유로 바로 바뀝니다.
 
-이미 만든 DB에는 `db/ddl/07_work_result_request.sql`, `db/ddl/08_downtime_reason.sql`, `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
+8. 실적에는 투입한 LOT(`inputs`)을 함께 보냅니다. 아래 LOT 추적을 참고하세요.
+
+이미 만든 DB에는 `db/ddl/07_work_result_request.sql`, `db/ddl/08_downtime_reason.sql`, `db/ddl/09_lot_tracking.sql`, `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
+
+## LOT 추적
+
+1. 원자재 입고: `POST /api/lots/receive`로 LOT 관리 원자재(환봉, 키홈 핀)를 입고하면 LOT이 생깁니다. 번호는 `품번-yyMMdd-001` (예: `RM-SCM-001-261018-001`).
+2. 실적 등록: 공정에 투입할 품목마다 LOT과 수량을 보냅니다. `GET /api/operations/{woOpId}/input-lots`가 투입할 품목과 쓸 수 있는 LOT(먼저 들어온 것부터)을 알려 줍니다.
+   - 첫 공정은 BOM의 LOT 관리 자재(`item.lot_yn = Y`), 그다음 공정은 같은 작업지시의 앞 공정에서 만든 LOT을 받습니다. 절삭유·연삭석 같은 소모품은 고르지 않습니다.
+   - 품목마다 투입 수량의 합이 (양품 + 불량) × 1개당 투입 수량과 같아야 합니다.
+   - 서버는 투입 LOT을 줄이고(0이 되면 `CONSUMED`), 양품 수량으로 산출 LOT을 만들고, 투입 → 산출을 `lot_genealogy`에 잇습니다. 실적과 같은 트랜잭션이라 하나라도 틀리면 실적도 저장되지 않습니다.
+   - 투입 LOT은 `UPDLOCK`으로 잠그고 읽어, 두 단말이 같은 LOT을 동시에 줄이지 못하게 합니다.
+3. 실적 취소: 만든 LOT은 폐기(`SCRAPPED`)하고 투입 수량을 돌려줍니다. 만든 LOT을 이미 다음 공정에 썼으면 409 `LOT_IN_USE` (뒤 공정의 실적부터 취소).
+4. 추적: `GET /api/lots/{lotNo}/trace`가 재귀 CTE로 역방향(이 LOT을 만든 재료, 원자재까지)과 정방향(이 LOT이 들어간 곳)을 함께 돌려줍니다. 취소한 실적의 계보는 뺍니다.
+5. 이력: `GET /api/lots/{lotNo}`에 입고·생산·투입·취소 이력이 일어난 순서대로 나옵니다.
+
+LOT 추적을 넣기 전에 시작한 작업지시는 앞 공정 LOT이 없어 두 번째 공정부터 실적을 등록할 수 없습니다. 새 작업지시로 확인합니다.
 
 ## 진동·온도 관리한계 알람 (CBM)
 
@@ -115,7 +131,7 @@ com.minimes
 │  ├─ config      Clock, 스케줄러, WebSocket(STOMP) 공통 설정
 │  └─ error       ErrorCode, BusinessException, 공통 오류 응답, 전역 예외 처리
 ├─ master         기준정보 (조회)
-│  ├─ domain      엔티티: Item, Routing, Equipment, CommonCode, Worker ...
+│  ├─ domain      엔티티: Item, Bom, Routing, Equipment, CommonCode, Worker ...
 │  ├─ repository  Spring Data JPA
 │  ├─ mapper      MyBatis (BOM 재귀 쿼리) → resources/mapper/master/BomMapper.xml
 │  ├─ service
@@ -126,6 +142,12 @@ com.minimes
 │  ├─ mapper      WorkListMapper (작업장의 작업 목록 + 앞 공정 양품) → resources/mapper/workorder/
 │  ├─ service     WorkOrderService, OperationService (시작·실적·완료·취소, requestId 중복 방지)
 │  └─ web         WorkOrderController, OperationController (POP API)
+├─ lot            LOT 입고, 실적의 투입·산출, 취소 되돌리기, 추적
+│  ├─ domain      Lot(남은 수량, 상태 규칙), LotGenealogy(투입 → 산출), LotHistory(이력), LotStatus, LotEventType
+│  ├─ repository  LotRepository (투입 LOT 잠금 조회 포함)
+│  ├─ mapper      LotTraceMapper (정방향·역방향 재귀 CTE) → resources/mapper/lot/LotTraceMapper.xml
+│  ├─ service     LotService (공정에 투입할 품목, 투입 확인, 기록, 취소)
+│  └─ web         LotController (/api/lots, 공정 투입 LOT)
 ├─ production     일별 생산 실적 집계, OEE 조회
 │  ├─ domain      ProductionDaily (production_daily, 복합키)
 │  ├─ repository
@@ -170,12 +192,17 @@ com.minimes
 | GET | `/api/workers/{workerId}` | 작업자 확인 (POP 로그인) |
 | GET | `/api/work-centers/{wcCode}/operations` | 작업장의 대기·진행 중인 공정 (POP 작업 목록) |
 | POST | `/api/operations/{woOpId}/start` | 공정 시작 (`{"workerId":"W1001"}`) |
-| POST | `/api/operations/{woOpId}/results` | 실적 등록 (`requestId`, `workerId`, `equipCode`, `goodQty`, `defects[]`) |
+| POST | `/api/operations/{woOpId}/results` | 실적 등록 (`requestId`, `workerId`, `equipCode`, `goodQty`, `defects[]`, `inputs[]`). 응답에 만든 LOT(`outputLotNo`) |
+| GET | `/api/operations/{woOpId}/input-lots` | 공정에 투입할 품목과 쓸 수 있는 LOT (먼저 들어온 것부터) |
 | GET | `/api/operations/{woOpId}/results` | 공정의 실적 목록 (취소 포함) |
 | POST | `/api/operations/{woOpId}/complete` | 공정 완료 (마지막 공정이면 작업지시도 완료) |
 | POST | `/api/results/{resultId}/cancel` | 실적 취소 (`{"workerId":"W1001","reason":"수량 오입력"}`) |
 | GET | `/api/equipment/{equipCode}/downtimes?limit=10` | 설비가 남긴 최근 정지 (POP 정지 사유 입력) |
 | PUT | `/api/downtimes/{downtimeId}/reason` | 정지 사유 확정 (`{"workerId":"W1001","dtCat":"MATERIAL","dtSub":"MAT_NOT_RECEIVED","note":"..."}`) |
+| POST | `/api/lots/receive` | 원자재 입고 (`{"itemCode":"RM-SCM-001","qty":100,"supplierLotNo":"A-1018","workerId":"W1001"}`) |
+| GET | `/api/lots?itemCode=RM-SCM-001&status=ACTIVE` | 품목의 LOT 목록 (최근 100개) |
+| GET | `/api/lots/{lotNo}` | LOT과 이력 |
+| GET | `/api/lots/{lotNo}/trace` | 역방향(`backward`)·정방향(`forward`) 추적 |
 | GET | `/api/monitoring/dashboard` | 설비 현황 (현재 상태, 정지 사유, 센서값, 오늘 OEE) |
 | GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
 | GET | `/api/oee/monthly?month=2025-10` | 설비별 월별 OEE (시간·수량 합산 후 계산) |
