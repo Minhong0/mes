@@ -171,6 +171,50 @@ class ProductionAggregationServiceTest {
         assertThat(daily(DAY).getProdQty()).isEqualTo(10);
     }
 
+    /**
+     * POP 실적 한 건 (불량 수량만 집계에 쓰인다). 공정 작업은 이 테스트와 상관없어 아무 번호나 넣는다.
+     * H2는 MSSQL 모드에서 MSSQL처럼 UNIQUE 컬럼의 NULL끼리도 중복으로 보므로 요청 ID를 넣는다.
+     */
+    void popResult(String endedAt, int goodQty, int defectQty, boolean cancelled) {
+        sequence++;
+        jdbcTemplate.update("""
+                INSERT INTO work_result (wo_op_id, equip_code, worker_id, started_at, ended_at, good_qty, defect_qty, source,
+                                         cancelled, cancelled_at, created_at, request_id)
+                VALUES (1, 'CNC01', 'W1001', ?, ?, ?, ?, 'POP', ?, ?, CURRENT_TIMESTAMP, ?)
+                """, LocalDateTime.parse(endedAt).minusHours(1), LocalDateTime.parse(endedAt), goodQty, defectQty,
+                cancelled, cancelled ? LocalDateTime.parse(endedAt) : null, "agg-req-" + sequence);
+    }
+
+    @Test
+    @DisplayName("POP 불량이 품질에 들어간다: 생산 6개 중 그날 불량 2개 → 양품 4 (취소한 실적, 다른 날 실적은 빼고)")
+    void defectsFromPop() {
+        for (int i = 0; i <= 6; i++) {
+            run("2026-10-16T%02d:%02d".formatted(8 + i * 12 / 60, i * 12 % 60), i);   // 08:00부터 12분마다 1개
+        }
+        popResult("2026-10-16T09:00", 3, 2, false);
+        popResult("2026-10-16T09:10", 0, 5, true);    // 취소
+        popResult("2026-10-17T09:00", 0, 3, false);   // 다음 날
+
+        aggregationService.aggregate(DAY);
+
+        assertThat(daily(DAY).getProdQty()).isEqualTo(6);
+        assertThat(daily(DAY).getDefectQty()).isEqualTo(2);
+        assertThat(daily(DAY).getGoodQty()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("불량이 설비 생산 수량보다 많으면 생산 수량까지만 반영한다 (prod = good + defect 제약을 지킨다)")
+    void defectsCappedAtProduced() {
+        run("2026-10-16T08:00", 0);
+        run("2026-10-16T08:24", 2);
+        popResult("2026-10-16T08:30", 0, 5, false);
+
+        aggregationService.aggregate(DAY);
+
+        assertThat(daily(DAY).getDefectQty()).isEqualTo(2);
+        assertThat(daily(DAY).getGoodQty()).isZero();
+    }
+
     @Test
     @DisplayName("부트캠프 실적이 있는 날은 덮어쓰지 않는다")
     void keepBootcamp() {

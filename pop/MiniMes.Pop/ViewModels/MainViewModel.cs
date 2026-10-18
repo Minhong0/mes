@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using MiniMes.Pop.Api;
+using MiniMes.Pop.Storage;
 
 namespace MiniMes.Pop.ViewModels;
 
@@ -11,20 +12,22 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly IMesApi _api;
     private readonly IDialogService _dialogs;
+    private readonly IPendingReportStore _pendingStore;
 
     [ObservableProperty]
     private ObservableObject _currentPage;
 
-    public MainViewModel(IMesApi api, IDialogService dialogs)
+    public MainViewModel(IMesApi api, IDialogService dialogs, IPendingReportStore pendingStore)
     {
         _api = api;
         _dialogs = dialogs;
+        _pendingStore = pendingStore;
         _currentPage = new LoginViewModel(api, OnLoggedIn);
     }
 
     private async void OnLoggedIn(Worker worker)
     {
-        var work = new WorkViewModel(_api, _dialogs, worker, Logout);
+        var work = new WorkViewModel(_api, _dialogs, _pendingStore, worker, Logout);
         CurrentPage = work;
         await work.InitializeAsync();
     }

@@ -1,6 +1,7 @@
 <UserControl x:Class="MiniMes.Pop.Views.WorkView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:MiniMes.Pop.Views">
     <UserControl.Resources>
         <!-- 공정 상태 배지: RUN = 진행(초록), WAIT = 대기(회색) -->
         <Style x:Key="StatusBadge" TargetType="Border">
@@ -58,207 +59,222 @@
             </StackPanel>
         </DockPanel>
 
-        <Grid Grid.Row="1">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="5*" />
-                <ColumnDefinition Width="6*" />
-            </Grid.ColumnDefinitions>
+        <!-- 본문: [작업] 탭과 [설비 정지] 탭. 보내지 못한 실적이 있어도 정지 사유는 입력할 수 있다 -->
+        <TabControl Grid.Row="1" Margin="8,8,8,0" Background="Transparent" BorderThickness="0" Padding="0">
+            <TabControl.Resources>
+                <Style TargetType="TabItem">
+                    <Setter Property="FontSize" Value="18" />
+                    <Setter Property="Padding" Value="20,8" />
+                    <Setter Property="MinHeight" Value="44" />
+                </Style>
+            </TabControl.Resources>
+            <TabItem Header="작업">
+                <Grid Margin="-8,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="5*" />
+                        <ColumnDefinition Width="6*" />
+                    </Grid.ColumnDefinitions>
 
-            <!-- 2) 왼쪽: 작업 목록 (진행 중인 것이 먼저) -->
-            <Border Grid.Column="0" Style="{StaticResource Panel}">
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="작업 목록" FontWeight="Bold" Margin="0,0,0,8" />
-                    <TextBlock DockPanel.Dock="Top" Text="이 작업장에 대기·진행 중인 작업이 없습니다." Style="{StaticResource MutedText}">
-                        <TextBlock.Visibility>
-                            <Binding Path="Operations.Count">
-                                <Binding.Converter>
-                                    <x:Static Member="Views:ZeroToVisibleConverter.Instance" xmlns:Views="clr-namespace:MiniMes.Pop.Views" />
-                                </Binding.Converter>
-                            </Binding>
-                        </TextBlock.Visibility>
-                    </TextBlock>
-                    <ListBox ItemsSource="{Binding Operations}" SelectedItem="{Binding SelectedOperation}" IsEnabled="{Binding IsInputEnabled}"
-                             BorderThickness="0" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="4,10">
-                                    <StackPanel>
-                                        <DockPanel>
-                                            <Border DockPanel.Dock="Right" Style="{StaticResource StatusBadge}">
-                                                <TextBlock Style="{StaticResource StatusText}" />
-                                            </Border>
-                                            <TextBlock FontWeight="Bold">
-                                                <Run Text="{Binding WoNo, Mode=OneWay}" />
-                                                <Run Text="{Binding ProcessName, Mode=OneWay}" Foreground="{StaticResource Accent}" />
-                                            </TextBlock>
-                                        </DockPanel>
-                                        <TextBlock Text="{Binding ItemName}" Style="{StaticResource MutedText}" />
-                                        <TextBlock FontSize="16">
-                                            <Run Text="양품" Foreground="{StaticResource Muted}" />
-                                            <Run Text="{Binding GoodQty, Mode=OneWay}" FontWeight="SemiBold" />
-                                            <Run Text="/ 계획" Foreground="{StaticResource Muted}" />
-                                            <Run Text="{Binding PlanQty, Mode=OneWay}" />
-                                            <Run Text=" · 불량" Foreground="{StaticResource Muted}" />
-                                            <Run Text="{Binding DefectQty, Mode=OneWay}" />
-                                            <Run Text=" · 앞 공정 양품" Foreground="{StaticResource Muted}" />
-                                            <Run Text="{Binding PrevGoodQty, Mode=OneWay, TargetNullValue=-}" />
-                                        </TextBlock>
-                                    </StackPanel>
-                                </Border>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                </DockPanel>
-            </Border>
-
-            <!-- 3) 오른쪽: 고른 작업의 시작·실적·완료 -->
-            <Border Grid.Column="1" Style="{StaticResource Panel}">
-                <Grid>
-                    <TextBlock Text="왼쪽에서 작업을 고르세요." Style="{StaticResource MutedText}" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Card}">
-                        <ScrollViewer.Style>
-                            <Style TargetType="ScrollViewer">
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding SelectedOperation}" Value="{x:Null}">
-                                        <Setter Property="Visibility" Value="Collapsed" />
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </ScrollViewer.Style>
-                        <StackPanel DataContext="{Binding}">
-                            <!-- 머리: 작업지시, 공정, 수량 -->
-                            <DockPanel>
-                                <Border DockPanel.Dock="Right" DataContext="{Binding SelectedOperation}" Style="{StaticResource StatusBadge}" VerticalAlignment="Top">
-                                    <TextBlock Style="{StaticResource StatusText}" />
-                                </Border>
-                                <TextBlock FontSize="24" FontWeight="Bold">
-                                    <Run Text="{Binding SelectedOperation.WoNo, Mode=OneWay}" />
-                                    <Run Text="{Binding SelectedOperation.ProcessName, Mode=OneWay}" Foreground="{StaticResource Accent}" />
-                                </TextBlock>
-                            </DockPanel>
-                            <TextBlock Text="{Binding SelectedOperation.ItemName}" Style="{StaticResource MutedText}" />
-                            <TextBlock FontSize="20" Margin="0,6,0,0">
-                                <Run Text="양품" Foreground="{StaticResource Muted}" />
-                                <Run Text="{Binding SelectedOperation.GoodQty, Mode=OneWay}" FontWeight="Bold" />
-                                <Run Text="/ 계획" Foreground="{StaticResource Muted}" />
-                                <Run Text="{Binding SelectedOperation.PlanQty, Mode=OneWay}" />
-                                <Run Text="  불량" Foreground="{StaticResource Muted}" />
-                                <Run Text="{Binding SelectedOperation.DefectQty, Mode=OneWay}" Foreground="{StaticResource Down}" />
+                    <!-- 2) 왼쪽: 작업 목록 (진행 중인 것이 먼저) -->
+                    <Border Grid.Column="0" Style="{StaticResource Panel}">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="작업 목록" FontWeight="Bold" Margin="0,0,0,8" />
+                            <TextBlock DockPanel.Dock="Top" Text="이 작업장에 대기·진행 중인 작업이 없습니다." Style="{StaticResource MutedText}">
+                                <TextBlock.Visibility>
+                                    <Binding Path="Operations.Count">
+                                        <Binding.Converter>
+                                            <x:Static Member="Views:ZeroToVisibleConverter.Instance" xmlns:Views="clr-namespace:MiniMes.Pop.Views" />
+                                        </Binding.Converter>
+                                    </Binding>
+                                </TextBlock.Visibility>
                             </TextBlock>
-
-                            <StackPanel Orientation="Horizontal" Margin="-4,10,0,0">
-                                <Button Content="작업 시작" Command="{Binding StartCommand}" Style="{StaticResource Primary}" MinWidth="160" />
-                                <Button Content="공정 완료" Command="{Binding CompleteCommand}" MinWidth="160" />
-                            </StackPanel>
-
-                            <!-- 실적 입력 -->
-                            <TextBlock Text="실적 입력" FontWeight="Bold" Margin="0,16,0,4" />
-                            <StackPanel Orientation="Horizontal" IsEnabled="{Binding IsInputEnabled}">
-                                <TextBlock Text="양품" Width="110" VerticalAlignment="Center" />
-                                <Button Content="-1" Command="{Binding AddGoodCommand}" CommandParameter="-1" />
-                                <TextBox Text="{Binding GoodQty, UpdateSourceTrigger=PropertyChanged}" Width="110" />
-                                <Button Content="+1" Command="{Binding AddGoodCommand}" CommandParameter="1" />
-                                <Button Content="+5" Command="{Binding AddGoodCommand}" CommandParameter="5" />
-                                <Button Content="+10" Command="{Binding AddGoodCommand}" CommandParameter="10" />
-                            </StackPanel>
-                            <ItemsControl ItemsSource="{Binding Defects}" IsEnabled="{Binding IsInputEnabled}">
-                                <ItemsControl.ItemTemplate>
+                            <ListBox ItemsSource="{Binding Operations}" SelectedItem="{Binding SelectedOperation}" IsEnabled="{Binding IsInputEnabled}"
+                                     BorderThickness="0" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                <ListBox.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Orientation="Horizontal">
-                                            <TextBlock Text="{Binding Name}" Width="110" VerticalAlignment="Center" Foreground="{StaticResource Down}" />
-                                            <Button Content="-1" Command="{Binding DecreaseCommand}" />
-                                            <TextBlock Text="{Binding Qty}" Width="110" FontSize="22" TextAlignment="Center" VerticalAlignment="Center" />
-                                            <Button Content="+1" Command="{Binding IncreaseCommand}" />
-                                        </StackPanel>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-
-                            <!-- 보내지 못한 실적이 있을 때만 보인다 -->
-                            <Border Visibility="{Binding HasPendingReport, Converter={StaticResource BoolToVisibility}}"
-                                    Background="#FFF6E5" BorderBrush="{StaticResource Warn}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,8,0,0">
-                                <DockPanel>
-                                    <Button DockPanel.Dock="Right" Content="버리기" Command="{Binding DiscardPendingCommand}" />
-                                    <TextBlock TextWrapping="Wrap" FontSize="15" VerticalAlignment="Center">
-                                        보내지 못한 실적이 있습니다. 같은 요청을 다시 보내도 한 번만 저장됩니다.
-                                        <LineBreak />
-                                        <Run Text="요청 ID" Foreground="{StaticResource Muted}" />
-                                        <Run Text="{Binding PendingReport.RequestId, Mode=OneWay}" Foreground="{StaticResource Muted}" />
-                                    </TextBlock>
-                                </DockPanel>
-                            </Border>
-
-                            <DockPanel Margin="0,8,0,0">
-                                <Button DockPanel.Dock="Right" Content="{Binding ReportButtonText}" Command="{Binding ReportCommand}"
-                                        Style="{StaticResource Primary}" MinWidth="200" />
-                                <TextBlock VerticalAlignment="Center" Style="{StaticResource MutedText}" FontSize="17">
-                                    <Run Text="합계" />
-                                    <Run Text="{Binding TotalQty, Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource Text}" />
-                                    <Run Text="개 (불량" />
-                                    <Run Text="{Binding DefectTotal, Mode=OneWay}" />
-                                    <Run Text="개)" />
-                                </TextBlock>
-                            </DockPanel>
-
-                            <!-- 이 공정의 실적 목록 -->
-                            <TextBlock Text="등록한 실적" FontWeight="Bold" Margin="0,20,0,4" />
-                            <ItemsControl ItemsSource="{Binding Results}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="0,6">
-                                            <DockPanel>
-                                                <Button DockPanel.Dock="Right" Content="취소" MinHeight="40"
-                                                        Command="{Binding DataContext.CancelResultCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                        CommandParameter="{Binding}">
-                                                    <Button.Style>
-                                                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding Cancelled}" Value="True">
-                                                                    <Setter Property="Visibility" Value="Collapsed" />
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Button.Style>
-                                                </Button>
-                                                <StackPanel>
-                                                    <TextBlock FontSize="16">
-                                                        <TextBlock.Style>
-                                                            <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding Cancelled}" Value="True">
-                                                                        <Setter Property="TextDecorations" Value="Strikethrough" />
-                                                                        <Setter Property="Foreground" Value="{StaticResource Muted}" />
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </TextBlock.Style>
-                                                        <Run Text="{Binding ResultId, Mode=OneWay, StringFormat=#{0}}" />
-                                                        <Run Text="{Binding StartedAt, Mode=OneWay, StringFormat=HH:mm}" />
-                                                        <Run Text="~" />
-                                                        <Run Text="{Binding EndedAt, Mode=OneWay, StringFormat=HH:mm}" />
-                                                        <Run Text="  양품" />
-                                                        <Run Text="{Binding GoodQty, Mode=OneWay}" FontWeight="SemiBold" />
-                                                        <Run Text="  불량" />
-                                                        <Run Text="{Binding DefectQty, Mode=OneWay}" />
-                                                        <Run Text="  " />
-                                                        <Run Text="{Binding EquipCode, Mode=OneWay}" />
+                                        <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="4,10">
+                                            <StackPanel>
+                                                <DockPanel>
+                                                    <Border DockPanel.Dock="Right" Style="{StaticResource StatusBadge}">
+                                                        <TextBlock Style="{StaticResource StatusText}" />
+                                                    </Border>
+                                                    <TextBlock FontWeight="Bold">
+                                                        <Run Text="{Binding WoNo, Mode=OneWay}" />
+                                                        <Run Text="{Binding ProcessName, Mode=OneWay}" Foreground="{StaticResource Accent}" />
                                                     </TextBlock>
-                                                    <TextBlock Style="{StaticResource MutedText}"
-                                                               Visibility="{Binding Cancelled, Converter={StaticResource BoolToVisibility}}">
-                                                        <Run Text="취소 사유:" />
-                                                        <Run Text="{Binding CancelReason, Mode=OneWay}" />
-                                                    </TextBlock>
-                                                </StackPanel>
-                                            </DockPanel>
+                                                </DockPanel>
+                                                <TextBlock Text="{Binding ItemName}" Style="{StaticResource MutedText}" />
+                                                <TextBlock FontSize="16">
+                                                    <Run Text="양품" Foreground="{StaticResource Muted}" />
+                                                    <Run Text="{Binding GoodQty, Mode=OneWay}" FontWeight="SemiBold" />
+                                                    <Run Text="/ 계획" Foreground="{StaticResource Muted}" />
+                                                    <Run Text="{Binding PlanQty, Mode=OneWay}" />
+                                                    <Run Text=" · 불량" Foreground="{StaticResource Muted}" />
+                                                    <Run Text="{Binding DefectQty, Mode=OneWay}" />
+                                                    <Run Text=" · 앞 공정 양품" Foreground="{StaticResource Muted}" />
+                                                    <Run Text="{Binding PrevGoodQty, Mode=OneWay, TargetNullValue=-}" />
+                                                </TextBlock>
+                                            </StackPanel>
                                         </Border>
                                     </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </StackPanel>
-                    </ScrollViewer>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </DockPanel>
+                    </Border>
+
+                    <!-- 3) 오른쪽: 고른 작업의 시작·실적·완료 -->
+                    <Border Grid.Column="1" Style="{StaticResource Panel}">
+                        <Grid>
+                            <TextBlock Text="왼쪽에서 작업을 고르세요." Style="{StaticResource MutedText}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{StaticResource Card}">
+                                <ScrollViewer.Style>
+                                    <Style TargetType="ScrollViewer">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedOperation}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ScrollViewer.Style>
+                                <StackPanel DataContext="{Binding}">
+                                    <!-- 머리: 작업지시, 공정, 수량 -->
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Right" DataContext="{Binding SelectedOperation}" Style="{StaticResource StatusBadge}" VerticalAlignment="Top">
+                                            <TextBlock Style="{StaticResource StatusText}" />
+                                        </Border>
+                                        <TextBlock FontSize="24" FontWeight="Bold">
+                                            <Run Text="{Binding SelectedOperation.WoNo, Mode=OneWay}" />
+                                            <Run Text="{Binding SelectedOperation.ProcessName, Mode=OneWay}" Foreground="{StaticResource Accent}" />
+                                        </TextBlock>
+                                    </DockPanel>
+                                    <TextBlock Text="{Binding SelectedOperation.ItemName}" Style="{StaticResource MutedText}" />
+                                    <TextBlock FontSize="20" Margin="0,6,0,0">
+                                        <Run Text="양품" Foreground="{StaticResource Muted}" />
+                                        <Run Text="{Binding SelectedOperation.GoodQty, Mode=OneWay}" FontWeight="Bold" />
+                                        <Run Text="/ 계획" Foreground="{StaticResource Muted}" />
+                                        <Run Text="{Binding SelectedOperation.PlanQty, Mode=OneWay}" />
+                                        <Run Text="  불량" Foreground="{StaticResource Muted}" />
+                                        <Run Text="{Binding SelectedOperation.DefectQty, Mode=OneWay}" Foreground="{StaticResource Down}" />
+                                    </TextBlock>
+
+                                    <StackPanel Orientation="Horizontal" Margin="-4,10,0,0">
+                                        <Button Content="작업 시작" Command="{Binding StartCommand}" Style="{StaticResource Primary}" MinWidth="160" />
+                                        <Button Content="공정 완료" Command="{Binding CompleteCommand}" MinWidth="160" />
+                                    </StackPanel>
+
+                                    <!-- 실적 입력 -->
+                                    <TextBlock Text="실적 입력" FontWeight="Bold" Margin="0,16,0,4" />
+                                    <StackPanel Orientation="Horizontal" IsEnabled="{Binding IsInputEnabled}">
+                                        <TextBlock Text="양품" Width="110" VerticalAlignment="Center" />
+                                        <Button Content="-1" Command="{Binding AddGoodCommand}" CommandParameter="-1" />
+                                        <TextBox Text="{Binding GoodQty, UpdateSourceTrigger=PropertyChanged}" Width="110" />
+                                        <Button Content="+1" Command="{Binding AddGoodCommand}" CommandParameter="1" />
+                                        <Button Content="+5" Command="{Binding AddGoodCommand}" CommandParameter="5" />
+                                        <Button Content="+10" Command="{Binding AddGoodCommand}" CommandParameter="10" />
+                                    </StackPanel>
+                                    <ItemsControl ItemsSource="{Binding Defects}" IsEnabled="{Binding IsInputEnabled}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Name}" Width="110" VerticalAlignment="Center" Foreground="{StaticResource Down}" />
+                                                    <Button Content="-1" Command="{Binding DecreaseCommand}" />
+                                                    <TextBlock Text="{Binding Qty}" Width="110" FontSize="22" TextAlignment="Center" VerticalAlignment="Center" />
+                                                    <Button Content="+1" Command="{Binding IncreaseCommand}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+
+                                    <!-- 보내지 못한 실적이 있을 때만 보인다 -->
+                                    <Border Visibility="{Binding HasPendingReport, Converter={StaticResource BoolToVisibility}}"
+                                            Background="#FFF6E5" BorderBrush="{StaticResource Warn}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,8,0,0">
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="버리기" Command="{Binding DiscardPendingCommand}" />
+                                            <TextBlock TextWrapping="Wrap" FontSize="15" VerticalAlignment="Center">
+                                                보내지 못한 실적이 있습니다. 같은 요청을 다시 보내도 한 번만 저장됩니다.
+                                                <LineBreak />
+                                                <Run Text="요청 ID" Foreground="{StaticResource Muted}" />
+                                                <Run Text="{Binding PendingReport.RequestId, Mode=OneWay}" Foreground="{StaticResource Muted}" />
+                                            </TextBlock>
+                                        </DockPanel>
+                                    </Border>
+
+                                    <DockPanel Margin="0,8,0,0">
+                                        <Button DockPanel.Dock="Right" Content="{Binding ReportButtonText}" Command="{Binding ReportCommand}"
+                                                Style="{StaticResource Primary}" MinWidth="200" />
+                                        <TextBlock VerticalAlignment="Center" Style="{StaticResource MutedText}" FontSize="17">
+                                            <Run Text="합계" />
+                                            <Run Text="{Binding TotalQty, Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource Text}" />
+                                            <Run Text="개 (불량" />
+                                            <Run Text="{Binding DefectTotal, Mode=OneWay}" />
+                                            <Run Text="개)" />
+                                        </TextBlock>
+                                    </DockPanel>
+
+                                    <!-- 이 공정의 실적 목록 -->
+                                    <TextBlock Text="등록한 실적" FontWeight="Bold" Margin="0,20,0,4" />
+                                    <ItemsControl ItemsSource="{Binding Results}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Border BorderBrush="{StaticResource Line}" BorderThickness="0,0,0,1" Padding="0,6">
+                                                    <DockPanel>
+                                                        <Button DockPanel.Dock="Right" Content="취소" MinHeight="40"
+                                                                Command="{Binding DataContext.CancelResultCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                CommandParameter="{Binding}">
+                                                            <Button.Style>
+                                                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                                                    <Style.Triggers>
+                                                                        <DataTrigger Binding="{Binding Cancelled}" Value="True">
+                                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                                        </DataTrigger>
+                                                                    </Style.Triggers>
+                                                                </Style>
+                                                            </Button.Style>
+                                                        </Button>
+                                                        <StackPanel>
+                                                            <TextBlock FontSize="16">
+                                                                <TextBlock.Style>
+                                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+                                                                        <Style.Triggers>
+                                                                            <DataTrigger Binding="{Binding Cancelled}" Value="True">
+                                                                                <Setter Property="TextDecorations" Value="Strikethrough" />
+                                                                                <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                                                                            </DataTrigger>
+                                                                        </Style.Triggers>
+                                                                    </Style>
+                                                                </TextBlock.Style>
+                                                                <Run Text="{Binding ResultId, Mode=OneWay, StringFormat=#{0}}" />
+                                                                <Run Text="{Binding StartedAt, Mode=OneWay, StringFormat=HH:mm}" />
+                                                                <Run Text="~" />
+                                                                <Run Text="{Binding EndedAt, Mode=OneWay, StringFormat=HH:mm}" />
+                                                                <Run Text="  양품" />
+                                                                <Run Text="{Binding GoodQty, Mode=OneWay}" FontWeight="SemiBold" />
+                                                                <Run Text="  불량" />
+                                                                <Run Text="{Binding DefectQty, Mode=OneWay}" />
+                                                                <Run Text="  " />
+                                                                <Run Text="{Binding EquipCode, Mode=OneWay}" />
+                                                            </TextBlock>
+                                                            <TextBlock Style="{StaticResource MutedText}"
+                                                                       Visibility="{Binding Cancelled, Converter={StaticResource BoolToVisibility}}">
+                                                                <Run Text="취소 사유:" />
+                                                                <Run Text="{Binding CancelReason, Mode=OneWay}" />
+                                                            </TextBlock>
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
                 </Grid>
-            </Border>
-        </Grid>
+            </TabItem>
+            <TabItem Header="{Binding Downtime.TabHeader}" AutomationProperties.Name="설비 정지">
+                <views:DowntimeView DataContext="{Binding Downtime}" Margin="-8,0" />
+            </TabItem>
+        </TabControl>
 
         <!-- 4) 아래: 결과 메시지. 오류면 빨간 바탕 -->
         <Border Grid.Row="2" Padding="16,10" Margin="8,0,8,8" CornerRadius="8">

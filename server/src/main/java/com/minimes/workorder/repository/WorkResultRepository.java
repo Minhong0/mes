@@ -3,6 +3,10 @@ package com.minimes.workorder.repository;
 import com.minimes.workorder.domain.WorkResult;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import java.time.LocalDateTime;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,4 +26,12 @@ public interface WorkResultRepository extends JpaRepository<WorkResult, Long> {
     /** 공정의 실적 목록 (최근 것부터, 불량 내역 함께) */
     @EntityGraph(attributePaths = "defects")
     List<WorkResult> findByWoOpIdOrderByResultIdDesc(long woOpId);
+
+    /** 설비가 [from, to)에 등록한 불량 수량 합계 (취소한 실적 제외). 일별 집계의 품질에 쓴다. */
+    @Query("""
+            select coalesce(sum(r.defectQty), 0) from WorkResult r
+            where r.equipCode = :equipCode and r.cancelled = false
+              and r.endedAt >= :from and r.endedAt < :to
+            """)
+    long sumDefectQty(@Param("equipCode") String equipCode, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 }

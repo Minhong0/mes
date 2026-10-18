@@ -11,6 +11,7 @@ import com.minimes.production.domain.ProductionDaily;
 import com.minimes.production.domain.ProductionDailyId;
 import com.minimes.production.domain.ProductionSource;
 import com.minimes.production.repository.ProductionDailyRepository;
+import com.minimes.workorder.repository.WorkResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -31,6 +32,7 @@ import java.util.Optional;
  *   생산 수량   = 그날 메시지의 누적 카운트(cycleCount)가 늘어난 양의 합
  *   계획 시간   = 그날 상태 이력이 덮는 시간 (설비 데이터가 있었던 시간)
  *   비가동 시간 = 그중 DOWN, SETUP 상태였던 시간
+ *   불량 수량   = 그날 POP에서 그 설비로 등록한 불량의 합 (취소한 실적 제외). 양품 = 생산 − 불량
  *
  * 같은 날을 몇 번 다시 집계해도 결과가 같다(멱등). 그래서 늦게 도착한 데이터가 있으면 그날을 다시 집계하면 된다.
  */
@@ -44,6 +46,7 @@ public class ProductionAggregationService {
     private final EquipmentDataRepository equipmentDataRepository;
     private final EquipmentStatusLogRepository statusLogRepository;
     private final ProductionDailyRepository productionDailyRepository;
+    private final WorkResultRepository workResultRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -90,14 +93,16 @@ public class ProductionAggregationService {
             return false;   // 그날 데이터가 없다 (production_daily는 계획 시간이 0보다 커야 한다)
         }
         int prodQty = countProduced(equipCode, from, to);
+        int defectQty = countDefects(equipCode, from, to, prodQty);
 
         if (existing.isPresent()) {
-            existing.get().updateFromMes(time.plannedMin(), time.downtimeMin(), prodQty, equipment.getIdealCtMin());
+            existing.get().updateFromMes(time.plannedMin(), time.downtimeMin(), prodQty, defectQty, equipment.getIdealCtMin());
         } else {
             productionDailyRepository.save(ProductionDaily.ofMes(date, equipCode, time.plannedMin(), time.downtimeMin(),
-                    prodQty, equipment.getIdealCtMin(), LocalDateTime.now(clock)));
+                    prodQty, defectQty, equipment.getIdealCtMin(), LocalDateTime.now(clock)));
         }
-        log.debug("[집계] {} {} 계획 {}분, 비가동 {}분, 생산 {}개", date, equipCode, time.plannedMin(), time.downtimeMin(), prodQty);
+        log.debug("[집계] {} {} 계획 {}분, 비가동 {}분, 생산 {}개, 불량 {}개", date, equipCode, time.plannedMin(), time.downtimeMin(),
+                prodQty, defectQty);
         return true;
     }
 
@@ -159,6 +164,20 @@ public class ProductionAggregationService {
             previous = current;
         }
         return total;
+    }
+
+    /**
+     * 그날 POP 불량 수량. 생산 수량(설비 카운트)이 기준이므로 그보다 많을 수는 없다.
+     * 더 많다면 카운트가 빠졌거나 입력을 잘못한 것이다. 경고를 남기고 생산 수량까지만 반영한다 (OEE 품질 0%).
+     */
+    private int countDefects(String equipCode, LocalDateTime from, LocalDateTime to, int prodQty) {
+        int defectQty = (int) workResultRepository.sumDefectQty(equipCode, from, to);
+        if (defectQty > prodQty) {
+            log.warn("[집계] {} {} 불량 {}개가 설비 생산 수량 {}개보다 많습니다. 생산 수량까지만 반영합니다.",
+                    from.toLocalDate(), equipCode, defectQty, prodQty);
+            return prodQty;
+        }
+        return defectQty;
     }
 
     private static int toMinutes(long seconds) {

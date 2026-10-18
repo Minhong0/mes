@@ -8,6 +8,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import com.minimes.common.error.BusinessException;
+import com.minimes.common.error.ErrorCode;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -47,7 +49,9 @@ public class Downtime {
     @Column(length = 10)
     private DowntimeSource source;
 
-    private String workerId;
+    private String workerId;                // 사유를 확정한 작업자
+
+    private LocalDateTime reasonAt;         // 작업자가 사유를 확정한 시각. null이면 설비가 보낸 사유 그대로
 
     private LocalDateTime createdAt;
 
@@ -62,6 +66,22 @@ public class Downtime {
         downtime.source = DowntimeSource.EQUIP;
         downtime.createdAt = now;
         return downtime;
+    }
+
+    /**
+     * 작업자가 POP에서 정지 사유를 확정한다. 정지 중이어도, 끝난 뒤에도 할 수 있다.
+     * 설비가 아는 것은 "멈췄다"와 알람 정도라, 실제 사유(자재 대기, 지그 교체 등)는 현장 작업자가 정한다.
+     * 부트캠프 과거 실적은 원본 자료라 고치지 않는다.
+     */
+    public void confirmReason(String dtCat, String dtSub, String note, String workerId, LocalDateTime now) {
+        if (source == DowntimeSource.BOOTCAMP) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION, "부트캠프 과거 실적의 정지 사유는 바꿀 수 없습니다.");
+        }
+        this.dtCat = dtCat;
+        this.dtSub = dtSub;
+        this.note = note;
+        this.workerId = workerId;
+        this.reasonAt = now;
     }
 
     /** 정지가 끝났다. 정지 시간(분)은 반올림한다. 예: 12분 40초 → 13분 */

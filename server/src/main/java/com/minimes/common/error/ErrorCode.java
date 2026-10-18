@@ -20,7 +20,8 @@ public enum ErrorCode {
     ALARM_ALREADY_ACKNOWLEDGED(HttpStatus.CONFLICT, "이미 확인한 알람입니다."),
     WORKER_NOT_FOUND(HttpStatus.NOT_FOUND, "작업자를 찾을 수 없습니다."),
     OPERATION_NOT_FOUND(HttpStatus.NOT_FOUND, "공정 작업을 찾을 수 없습니다."),
-    RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "실적을 찾을 수 없습니다.");
+    RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "실적을 찾을 수 없습니다."),
+    DOWNTIME_NOT_FOUND(HttpStatus.NOT_FOUND, "정지 기록을 찾을 수 없습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

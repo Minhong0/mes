@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MiniMes.Pop.Api;
+using MiniMes.Pop.Storage;
 
 namespace MiniMes.Pop.ViewModels;
 
@@ -11,6 +12,9 @@ namespace MiniMes.Pop.ViewModels;
 /// 실적 전송이 통신 오류로 실패하면, 보낸 요청(같은 RequestId)을 PendingReport에 잡아 두고 입력을 잠근다.
 /// 서버에 저장됐는지 알 수 없으므로 새로 입력받지 않고 "같은 요청"을 다시 보내게 한다.
 /// 서버는 RequestId가 같으면 한 번만 저장하므로, 몇 번을 다시 보내도 실적이 두 번 생기지 않는다.
+///
+/// 요청은 보내기 전에 단말 파일(IPendingReportStore)에도 적어 둔다. 응답을 기다리다 POP가 꺼져도
+/// 다음에 로그인하면 그 요청을 같은 RequestId로 다시 보낸다.
 /// </summary>
 public partial class WorkViewModel : ObservableObject
 {
@@ -19,21 +23,38 @@ public partial class WorkViewModel : ObservableObject
 
     private readonly IMesApi _api;
     private readonly IDialogService _dialogs;
+    private readonly IPendingReportStore _pendingStore;
     private readonly Action _logout;
     private IReadOnlyList<Equipment> _allEquipment = [];
     private bool _initialized;
     private bool _keepInputs;
     private int _resultsVersion;   // 목록을 새로 받는 동안 선택이 잠깐 바뀌어도 입력을 지우지 않는다
+    private long _pendingWoOpId;   // 보내지 못한 실적이 어느 공정의 것인가
 
-    public WorkViewModel(IMesApi api, IDialogService dialogs, Worker worker, Action logout)
+    public WorkViewModel(IMesApi api, IDialogService dialogs, IPendingReportStore pendingStore, Worker worker, Action logout)
     {
         _api = api;
         _dialogs = dialogs;
+        _pendingStore = pendingStore;
         _logout = logout;
         Worker = worker;
+        Downtime = new DowntimeViewModel(api, worker, (message, isError) =>
+        {
+            if (isError)
+            {
+                ShowError(message);
+            }
+            else
+            {
+                ShowInfo(message);
+            }
+        });
     }
 
     public Worker Worker { get; }
+
+    /// <summary>설비 정지 탭</summary>
+    public DowntimeViewModel Downtime { get; }
 
     public ObservableCollection<string> WorkCenters { get; } = [];
 
@@ -87,7 +108,10 @@ public partial class WorkViewModel : ObservableObject
 
     public string ReportButtonText => PendingReport == null ? "실적 등록" : "다시 보내기";
 
-    /// <summary>설비·불량 유형을 읽고 소속 작업장의 작업 목록을 띄운다.</summary>
+    /// <summary>
+    /// 설비·불량 유형·정지 사유를 읽고 소속 작업장의 작업 목록을 띄운다.
+    /// 지난번에 결과를 모른 채 끝난 실적이 단말에 남아 있으면 그 작업장을 열고 다시 보낸다.
+    /// </summary>
     public async Task InitializeAsync()
     {
         try
@@ -97,6 +121,7 @@ public partial class WorkViewModel : ObservableObject
             {
                 Defects.Add(new DefectEntry(code.Code, code.CodeName, OnDefectChanged));
             }
+            await Downtime.InitializeAsync();
         }
         catch (Exception e) when (e is MesApiException or MesConnectionException)
         {
@@ -108,8 +133,32 @@ public partial class WorkViewModel : ObservableObject
         {
             WorkCenters.Add(wc);
         }
+        var saved = _pendingStore.Load(Worker.WorkerId);
+        // 관리자는 소속 작업장이 없다. 보내지 못한 실적이 있으면 그 작업장부터
+        SelectedWorkCenter = saved?.WcCode ?? Worker.WcCode ?? WorkCenters.FirstOrDefault();
         _initialized = true;
-        SelectedWorkCenter = Worker.WcCode ?? WorkCenters.FirstOrDefault();   // 관리자는 소속 작업장이 없다
+        await RefreshAsync();
+        if (saved != null)
+        {
+            await ResendSavedAsync(saved);
+        }
+    }
+
+    /// <summary>지난번에 보내지 못한 실적: 같은 요청을 그대로 다시 보낸다. 이미 저장됐어도 서버가 한 번만 남긴다.</summary>
+    private async Task ResendSavedAsync(SavedReport saved)
+    {
+        _keepInputs = true;
+        SelectedOperation = Operations.FirstOrDefault(o => o.WoOpId == saved.WoOpId) ?? SelectedOperation;
+        _keepInputs = false;
+        _pendingWoOpId = saved.WoOpId;
+        PendingReport = saved.Request;
+        GoodQty = saved.Request.GoodQty;   // 다시 보내는 동안 무엇을 보내는지 화면에 보인다
+        foreach (var d in Defects)
+        {
+            d.Qty = saved.Request.Defects.FirstOrDefault(l => l.DefectType == d.Code)?.Qty ?? 0;
+        }
+        await SendReportAsync(saved.WoOpId, saved.WoNo, saved.ProcessName, saved.Request,
+            $"지난번에 결과를 모른 채 끝난 실적({saved.WoNo} {saved.ProcessName}, {saved.SavedAt:MM-dd HH:mm})");
     }
 
     partial void OnSelectedWorkCenterChanged(string? value)
@@ -123,6 +172,14 @@ public partial class WorkViewModel : ObservableObject
         if (_initialized)
         {
             _ = RefreshAsync();
+        }
+    }
+
+    partial void OnSelectedEquipmentChanged(Equipment? value)
+    {
+        if (_initialized)
+        {
+            _ = Downtime.ShowEquipmentAsync(value?.EquipCode);
         }
     }
 
@@ -162,6 +219,7 @@ public partial class WorkViewModel : ObservableObject
             {
                 await LoadResultsAsync();   // 값이 그대로라 변경 알림이 오지 않은 경우에도 실적 목록은 새로 읽는다
             }
+            await Downtime.ShowEquipmentAsync(SelectedEquipment?.EquipCode);
         }
         catch (Exception e) when (e is MesApiException or MesConnectionException)
         {
@@ -183,28 +241,47 @@ public partial class WorkViewModel : ObservableObject
         });
     }
 
+    // 보내지 못한 실적은 고른 작업과 상관없이 원래 공정으로 다시 보낸다
     private bool CanReport() =>
-        !IsBusy && SelectedOperation?.Status == StatusRun && (PendingReport != null || TotalQty > 0);
+        !IsBusy && (PendingReport != null || (SelectedOperation?.Status == StatusRun && TotalQty > 0));
 
     /// <summary>실적 등록. 보내지 못한 실적이 있으면 새로 만들지 않고 그 요청을 다시 보낸다.</summary>
     [RelayCommand(CanExecute = nameof(CanReport))]
     private async Task ReportAsync()
     {
+        if (PendingReport != null)
+        {
+            var saved = _pendingStore.Load(Worker.WorkerId);
+            await SendReportAsync(_pendingWoOpId, saved?.WoNo ?? "", saved?.ProcessName ?? "", PendingReport, "실적");
+            return;
+        }
         var op = SelectedOperation!;
-        var request = PendingReport ?? new ReportRequest(
+        var request = new ReportRequest(
             Guid.NewGuid().ToString(),
             Worker.WorkerId,
             SelectedEquipment?.EquipCode,
             GoodQty,
             Defects.Where(d => d.Qty > 0).Select(d => new DefectLine(d.Code, d.Qty)).ToList());
+        _pendingWoOpId = op.WoOpId;
+        await SendReportAsync(op.WoOpId, op.WoNo, op.ProcessName, request, "실적");
+    }
 
+    /// <summary>
+    /// 실적 요청을 보낸다. 보내기 전에 단말 파일에 적고, 결과가 확실해지면(저장됨 / 서버 거절) 지운다.
+    /// 응답이 없으면 파일과 화면(PendingReport)에 남겨 같은 요청을 다시 보내게 한다.
+    /// </summary>
+    private async Task SendReportAsync(long woOpId, string woNo, string processName, ReportRequest request, string label)
+    {
         IsBusy = true;
         try
         {
-            var result = await _api.ReportAsync(op.WoOpId, request);
+            _pendingStore.Save(new SavedReport(Worker.WorkerId, SelectedWorkCenter ?? "", woOpId, woNo, processName,
+                request, DateTime.Now));
+            var result = await _api.ReportAsync(woOpId, request);
+            _pendingStore.Clear(Worker.WorkerId);
             PendingReport = null;
             ResetInputs();
-            ShowInfo($"실적을 등록했습니다: 양품 {result.GoodQty}, 불량 {result.DefectQty}");
+            ShowInfo($"{label}을 등록했습니다: 양품 {result.GoodQty}, 불량 {result.DefectQty}");
             await RefreshAsync();
         }
         catch (MesConnectionException e)
@@ -214,14 +291,19 @@ public partial class WorkViewModel : ObservableObject
         }
         catch (MesApiException e)
         {
+            _pendingStore.Clear(Worker.WorkerId);
             PendingReport = null;      // 서버가 거절했다: 저장되지 않은 것이 확실하다
-            ShowError(e.Message);
+            ShowError(PendingLabel(label, e.Message));
         }
         finally
         {
             IsBusy = false;
         }
     }
+
+    // 새로 입력한 실적이 거절되면 서버 메시지만, 지난번 실적이 거절되면 어떤 실적인지 함께 보여 준다
+    private static string PendingLabel(string label, string message) =>
+        label == "실적" ? message : $"{label}을 서버가 받지 않았습니다: {message}";
 
     private bool CanDiscardPending() => PendingReport != null;
 
@@ -233,6 +315,7 @@ public partial class WorkViewModel : ObservableObject
         {
             return;
         }
+        _pendingStore.Clear(Worker.WorkerId);
         PendingReport = null;
         ResetInputs();
         await RefreshAsync();
@@ -283,7 +366,8 @@ public partial class WorkViewModel : ObservableObject
     [RelayCommand]
     private void Logout()
     {
-        if (PendingReport != null && !_dialogs.Confirm("보내지 못한 실적이 있습니다. 그래도 로그아웃할까요?"))
+        if (PendingReport != null &&
+            !_dialogs.Confirm("보내지 못한 실적이 있습니다. 그래도 로그아웃할까요?\n이 단말에 저장해 두었다가 다음에 로그인하면 다시 보냅니다."))
         {
             return;
         }

@@ -1,5 +1,6 @@
 using System.Windows;
 using MiniMes.Pop.Api;
+using MiniMes.Pop.Storage;
 using MiniMes.Pop.ViewModels;
 using MiniMes.Pop.Views;
 
@@ -8,6 +9,7 @@ namespace MiniMes.Pop;
 /// <summary>
 /// 시작할 때 서버 주소를 정하고, API·대화 상자·ViewModel을 만들어 창에 연결한다.
 /// 서버 주소: 환경 변수 MES_URL (없으면 http://localhost:8080/)
+/// 보내지 못한 실적: %LOCALAPPDATA%\MiniMes.Pop\pending\{사번}.json
 /// </summary>
 public partial class App : Application
 {
@@ -20,7 +22,7 @@ public partial class App : Application
 
         var serverUrl = Environment.GetEnvironmentVariable("MES_URL") ?? "http://localhost:8080/";
         var api = new MesApiClient(new Uri(serverUrl), RequestTimeout);
-        var window = new MainWindow { DataContext = new MainViewModel(api, new WpfDialogService()) };
+        var window = new MainWindow { DataContext = new MainViewModel(api, new WpfDialogService(), new FilePendingReportStore(FilePendingReportStore.DefaultDirectory)) };
         window.Show();
     }
 }

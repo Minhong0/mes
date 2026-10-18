@@ -21,6 +21,8 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,6 +45,7 @@ import static org.assertj.core.api.Assertions.tuple;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
+@RecordApplicationEvents
 @Sql({"/sql/work-order-fixture.sql", "/sql/pop-fixture.sql"})
 class OperationServiceTest {
 
@@ -96,6 +99,9 @@ class OperationServiceTest {
 
     @Autowired
     EntityManager entityManager;
+
+    @Autowired
+    ApplicationEvents events;
 
     WorkOrder wo;
     long op10;
@@ -236,5 +242,20 @@ class OperationServiceTest {
         assertThat(wc100.getFirst().processName()).isEqualTo("CNC 선삭");
         assertThat(wc200).extracting(OperationItem::woNo, OperationItem::prevGoodQty)
                 .containsExactlyInAnyOrder(tuple(second.getWoNo(), 12), tuple(wo.getWoNo(), 0));
+    }
+
+    @Test
+    @DisplayName("실적을 등록·취소하면 그날 집계를 다시 하라고 알린다. 설비를 비운 실적, 다시 보낸 요청은 알리지 않는다")
+    void resultChangedEvent() {
+        operationService.start(op10, "W1001");
+        ReportCommand command = report(5, new DefectLine("OVERSIZE", 1));
+        WorkResult result = operationService.report(op10, command);
+        operationService.report(op10, command);   // 다시 보낸 요청
+        operationService.report(op10, new ReportCommand(UUID.randomUUID().toString(), "W1001", null, 2, List.of()));
+        operationService.cancel(result.getResultId(), "W1001", "수량 오입력");
+
+        assertThat(events.stream(WorkResultChangedEvent.class))
+                .containsExactly(new WorkResultChangedEvent("CNC01", T0.toLocalDate()),
+                        new WorkResultChangedEvent("CNC01", T0.toLocalDate()));
     }
 }

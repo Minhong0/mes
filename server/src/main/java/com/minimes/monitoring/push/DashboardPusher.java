@@ -1,6 +1,7 @@
 package com.minimes.monitoring.push;
 
 import com.minimes.alarm.service.AlarmAcknowledgedEvent;
+import com.minimes.equipment.service.DowntimeReasonChangedEvent;
 import com.minimes.equipment.service.EquipmentDataSavedEvent;
 import com.minimes.monitoring.service.MonitoringService;
 import com.minimes.production.service.ProductionAggregatedEvent;
@@ -48,6 +49,11 @@ public class DashboardPusher {
     @TransactionalEventListener
     public void onAlarmAcknowledged(AlarmAcknowledgedEvent event) {
         changed.set(true);
+    }
+
+    @TransactionalEventListener
+    public void onDowntimeReasonChanged(DowntimeReasonChangedEvent event) {
+        changed.set(true);   // 정지 중인 설비 카드의 사유 표시가 바뀐다
     }
 
     @Scheduled(fixedDelayString = "${mes.monitoring.push.interval:PT1S}")

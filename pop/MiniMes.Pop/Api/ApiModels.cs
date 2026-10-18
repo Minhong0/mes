@@ -49,5 +49,21 @@ public sealed record WorkResult(
     string? CancelReason,
     IReadOnlyList<DefectLine> Defects);
 
+/// <summary>설비가 남긴 정지 한 건. EndedAt이 null이면 아직 정지 중, ReasonAt이 null이면 작업자가 사유를 확정하지 않았다</summary>
+public sealed record Downtime(
+    long DowntimeId,
+    string EquipCode,
+    DateTime StartedAt,
+    DateTime? EndedAt,
+    int? DurationMin,
+    string DtCat,
+    string? DtSub,
+    string? Note,
+    string? WorkerId,
+    DateTime? ReasonAt);
+
+/// <summary>정지 사유 확정 요청. DtSub, Note는 비워도 된다</summary>
+public sealed record ReasonRequest(string WorkerId, string DtCat, string? DtSub, string? Note);
+
 /// <summary>서버 오류 응답 (common.error.ErrorResponse)</summary>
 public sealed record ApiError(string Code, string Message);

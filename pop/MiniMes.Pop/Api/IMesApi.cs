@@ -27,6 +27,12 @@ public interface IMesApi
     Task<IReadOnlyList<WorkResult>> GetResultsAsync(long woOpId);
 
     Task<WorkResult> CancelResultAsync(long resultId, string workerId, string reason);
+
+    /// <summary>설비의 최근 정지 (최근 것부터)</summary>
+    Task<IReadOnlyList<Downtime>> GetDowntimesAsync(string equipCode, int limit);
+
+    /// <summary>정지 사유 확정. 같은 내용으로 다시 보내도 결과가 같다</summary>
+    Task<Downtime> ConfirmDowntimeReasonAsync(long downtimeId, ReasonRequest request);
 }
 
 /// <summary>서버가 요청을 거절했다. Code는 서버의 ErrorCode (예: INVALID_STATUS_TRANSITION)</summary>

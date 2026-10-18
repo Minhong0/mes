@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -26,6 +27,7 @@ import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -321,5 +323,68 @@ class MssqlIntegrationTest {
                         .content("{\"workerId\":\"W1001\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("DONE"));
+    }
+
+    @Autowired
+    JdbcTemplate jdbcTemplate;
+
+    @Test
+    @DisplayName("POP B (JPQL SUM, reason_at 컬럼): 불량이 OEE 품질에 반영되고, 작업자가 확정한 정지 사유가 파레토에 나온다")
+    void popQualityAndDowntimeReason() throws Exception {
+        // CNC02: 2026-10-25 08:00부터 12분마다 1개씩 6개, 09:12~09:22 정지(센서 불량)
+        for (int i = 0; i <= 6; i++) {
+            sendCnc02("2026-10-25T%02d:%02d:00+09:00".formatted(8 + i * 12 / 60, i * 12 % 60), i, "RUN", null, null);
+        }
+        sendCnc02("2026-10-25T09:12:30+09:00", 6, "DOWN", "BREAKDOWN", "BRK_SENSOR");
+        sendCnc02("2026-10-25T09:22:30+09:00", 6, "RUN", null, null);
+
+        // POP 실적: 실적의 시각은 서버 시계라 테스트가 정할 수 없어, 그날 실적을 직접 넣는다
+        String created = mockMvc.perform(post("/api/work-orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemCode\":\"FG-SFT-100\",\"planQty\":10}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        int op10 = JsonPath.read(created, "$.operations[0].woOpId");
+        String insert = """
+                INSERT INTO work_result (wo_op_id, equip_code, worker_id, started_at, ended_at, good_qty, defect_qty, source,
+                                         cancelled, cancelled_at, request_id)
+                VALUES (?, 'CNC02', 'W1001', '2026-10-25 08:00', ?, ?, ?, 'POP', ?, ?, ?)
+                """;
+        jdbcTemplate.update(insert, op10, "2026-10-25 09:00", 4, 2, false, null, "it-q-1");
+        jdbcTemplate.update(insert, op10, "2026-10-25 09:05", 0, 3, true, "2026-10-25 09:06", "it-q-2");   // 취소
+
+        mockMvc.perform(post("/api/production-daily/aggregate").param("date", "2026-10-25"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.equipCode == 'CNC02')].prodQty").value(hasItem(6)))
+                .andExpect(jsonPath("$[?(@.equipCode == 'CNC02')].goodQty").value(hasItem(4)))
+                .andExpect(jsonPath("$[?(@.equipCode == 'CNC02')].quality").value(hasItem(66.67)));
+
+        String downtimes = mockMvc.perform(get("/api/equipment/CNC02/downtimes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].dtSub").value("BRK_SENSOR"))
+                .andExpect(jsonPath("$[0].durationMin").value(10))
+                .andExpect(jsonPath("$[0].reasonAt").doesNotExist())
+                .andReturn().getResponse().getContentAsString();
+        int downtimeId = JsonPath.read(downtimes, "$[0].downtimeId");
+
+        mockMvc.perform(put("/api/downtimes/{id}/reason", downtimeId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W1001\",\"dtCat\":\"MATERIAL\",\"dtSub\":\"BRK_SENSOR\"}"))
+                .andExpect(status().isBadRequest());   // 소분류가 대분류에 속하지 않는다
+        mockMvc.perform(put("/api/downtimes/{id}/reason", downtimeId).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W1001\",\"dtCat\":\"MATERIAL\",\"dtSub\":\"MAT_NOT_RECEIVED\",\"note\":\"소재 입고 지연\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.workerId").value("W1001"))
+                .andExpect(jsonPath("$.reasonAt").isNotEmpty());
+
+        mockMvc.perform(get("/api/monitoring/downtime-pareto")
+                        .param("from", "2026-10-25").param("to", "2026-10-25").param("equipCode", "CNC02"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].dtSubName").value("원자재 미입고"))
+                .andExpect(jsonPath("$.items[0].totalMin").value(10));
+    }
+
+    private void sendCnc02(String collectedAt, int cycleCount, String status, String dtCat, String dtSub) {
+        equipmentDataService.save(new EquipmentMessage("CNC02-IT-" + collectedAt, "CNC02", OffsetDateTime.parse(collectedAt),
+                cycleCount, status, new BigDecimal("1.2"), new BigDecimal("35.0"), dtCat, dtSub));
     }
 }

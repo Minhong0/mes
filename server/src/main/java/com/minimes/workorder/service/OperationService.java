@@ -15,6 +15,7 @@ import com.minimes.workorder.mapper.WorkListMapper;
 import com.minimes.workorder.repository.WorkOrderOperationRepository;
 import com.minimes.workorder.repository.WorkResultRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +41,7 @@ public class OperationService {
     private final EquipmentRepository equipmentRepository;
     private final CommonCodeRepository commonCodeRepository;
     private final MasterQueryService masterQueryService;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -76,7 +78,9 @@ public class OperationService {
         WorkResult result = WorkResult.fromPop(command.requestId(), woOpId, command.equipCode(), command.workerId(),
                 command.goodQty(), command.defects(), startedAt, now);
         op.addResult(result.getGoodQty(), result.getDefectQty());
-        return resultRepository.save(result);
+        resultRepository.save(result);
+        publishChanged(result);
+        return result;
     }
 
     public WorkOrderOperation complete(long woOpId, String workerId) {
@@ -94,6 +98,7 @@ public class OperationService {
         WorkOrderOperation op = getOperation(result.getWoOpId());
         result.cancel(workerId, reason, LocalDateTime.now(clock));
         op.removeResult(result.getGoodQty(), result.getDefectQty());
+        publishChanged(result);
         return result;
     }
 
@@ -106,6 +111,13 @@ public class OperationService {
     private WorkOrderOperation getOperation(long woOpId) {
         return operationRepository.findById(woOpId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.OPERATION_NOT_FOUND, "공정 작업을 찾을 수 없습니다: " + woOpId));
+    }
+
+    /** 설비를 적은 실적만 일별 집계(설비별)에 들어간다. */
+    private void publishChanged(WorkResult result) {
+        if (result.getEquipCode() != null) {
+            eventPublisher.publishEvent(new WorkResultChangedEvent(result.getEquipCode(), result.getEndedAt().toLocalDate()));
+        }
     }
 
     /** 설비는 비워도 되지만, 적었다면 그 공정의 작업장 설비여야 한다. */

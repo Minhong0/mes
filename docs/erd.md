@@ -132,6 +132,8 @@ erDiagram
         varchar dt_cat
         varchar dt_sub
         varchar source "BOOTCAMP, POP, EQUIP"
+        varchar worker_id "사유를 확정한 작업자"
+        datetime2 reason_at "사유 확정 시각"
     }
     PRODUCTION_DAILY {
         date prod_date PK

@@ -54,29 +54,32 @@ public class ProductionDaily {
     private LocalDateTime createdAt;
 
     public static ProductionDaily ofMes(LocalDate prodDate, String equipCode, int plannedMin, int downtimeMin,
-                                        int prodQty, BigDecimal idealCtMin, LocalDateTime now) {
+                                        int prodQty, int defectQty, BigDecimal idealCtMin, LocalDateTime now) {
         ProductionDaily daily = new ProductionDaily();
         daily.prodDate = prodDate;
         daily.equipCode = equipCode;
         daily.source = ProductionSource.MES;
         daily.createdAt = now;
-        daily.updateFromMes(plannedMin, downtimeMin, prodQty, idealCtMin);
+        daily.updateFromMes(plannedMin, downtimeMin, prodQty, defectQty, idealCtMin);
         return daily;
     }
 
     /**
      * 다시 집계한 값으로 바꾼다. 같은 날을 여러 번 집계해도 마지막 값만 남는다.
-     * 불량 수량은 아직 입력하는 곳이 없어(POP 검사 입력 예정) 모두 양품으로 둔다.
+     * 생산 수량은 설비 카운트, 불량은 POP 실적이다. 양품 = 생산 − 불량.
      */
-    public void updateFromMes(int plannedMin, int downtimeMin, int prodQty, BigDecimal idealCtMin) {
+    public void updateFromMes(int plannedMin, int downtimeMin, int prodQty, int defectQty, BigDecimal idealCtMin) {
         if (source != ProductionSource.MES) {
             throw new IllegalStateException("부트캠프 실적은 덮어쓸 수 없습니다: " + prodDate + " " + equipCode);
         }
         this.plannedMin = plannedMin;
         this.downtimeMin = downtimeMin;
         this.prodQty = prodQty;
-        this.goodQty = prodQty;
-        this.defectQty = 0;
+        if (defectQty < 0 || defectQty > prodQty) {
+            throw new IllegalArgumentException("불량 수량은 0 ~ 생산 수량이어야 합니다: 생산 %d, 불량 %d".formatted(prodQty, defectQty));
+        }
+        this.goodQty = prodQty - defectQty;
+        this.defectQty = defectQty;
         this.idealCtMin = idealCtMin;
     }
 }

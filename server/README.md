@@ -36,8 +36,10 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
 3. 공정 시작 → 실적 등록(여러 번) → 공정 완료. 첫 공정을 시작하면 작업지시가 진행이 되고, 마지막 공정을 완료하면 작업지시가 완료됩니다.
 4. 실적에는 POP가 만든 `requestId`를 붙입니다. 같은 `requestId`로 다시 보내면 새로 저장하지 않고 처음 실적을 돌려줍니다 (`work_result.request_id` 필터 UNIQUE 인덱스).
 5. 실적은 고치지 않고 취소 표시 후 새로 등록합니다. 취소하면 공정 합계에서 빠지고, 마감한 작업지시는 취소할 수 없습니다.
+6. 설비를 적은 실적을 등록·취소하면 그날 일별 집계를 다시 합니다 (불량 수량 → OEE 품질).
+7. 정지 사유: `GET /api/equipment/{equipCode}/downtimes`로 설비가 남긴 최근 정지를 받고, `PUT /api/downtimes/{downtimeId}/reason`으로 작업자가 대분류·소분류를 확정합니다. 소분류는 그 대분류에 속해야 하고(공통코드 `parent_code`), 확정한 작업자와 시각(`reason_at`)이 남습니다. 모니터링 화면과 정지 사유 파레토는 확정한 사유로 바로 바뀝니다.
 
-이미 만든 DB에는 `db/ddl/07_work_result_request.sql`과 `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
+이미 만든 DB에는 `db/ddl/07_work_result_request.sql`, `db/ddl/08_downtime_reason.sql`, `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
 
 ## 진동·온도 관리한계 알람 (CBM)
 
@@ -59,11 +61,13 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
 | 생산 수량 | 그날 메시지의 누적 카운트(`cycleCount`)가 늘어난 양의 합. 카운트가 줄면(시뮬레이터 재시작) 새 값을 더함 |
 | 계획 시간 | 그날 상태 이력이 덮는 시간 (설비 데이터가 있었던 시간) |
 | 비가동 시간 | 그중 DOWN, SETUP 시간 |
-| 양품·불량 | 아직 입력하는 곳이 없어 모두 양품 (POP 검사 입력 예정) |
+| 불량 | 그날 POP에서 그 설비로 등록한 불량의 합 (취소한 실적 제외, 실적 등록 시각 기준). 생산 수량보다 많으면 경고를 남기고 생산 수량까지만 |
+| 양품 | 생산 수량 − 불량 |
 
-- `ProductionAggregationScheduler`가 1분마다, 새 데이터가 들어온 날짜만 다시 집계합니다 (`mes.aggregation.*`).
+- `ProductionAggregationScheduler`가 1분마다, 새 데이터가 들어온 날짜와 POP 실적이 바뀐 날짜만 다시 집계합니다 (`mes.aggregation.*`).
 - 부트캠프 실적이 있는 날짜는 덮어쓰지 않습니다.
 - 시각은 모두 공장 시계(시뮬레이터가 보낸 측정 시각) 기준입니다. 600배속이면 현실 1분에 공장 시계 10시간이 흐릅니다.
+- POP 실적의 시각은 서버 시계입니다. 실제 공장에서는 두 시계가 같지만, 시뮬레이터를 배속으로 돌리면 공장 시계가 앞서 나가 실적이 다른 날짜에 들어갈 수 있습니다.
 
 ## 설비 데이터 수집 (MQTT)
 
@@ -126,7 +130,7 @@ com.minimes
 │  ├─ domain      ProductionDaily (production_daily, 복합키)
 │  ├─ repository
 │  ├─ mapper      OeeMapper (v_oee_daily, v_oee_monthly) → resources/mapper/production/OeeMapper.xml
-│  ├─ service     ProductionAggregationService (집계), ProductionAggregationScheduler (1분마다)
+│  ├─ service     ProductionAggregationService (집계, POP 불량 포함), ProductionAggregationScheduler (1분마다 + 실적이 바뀐 날짜)
 │  └─ web         OeeController
 ├─ alarm          관리한계(UCL) 계산, 알람 기록·확인
 │  ├─ domain      EquipmentLimit (equipment_limit), EquipmentAlarm (equipment_alarm), LimitMetric, AlarmType
@@ -135,14 +139,15 @@ com.minimes
 │  ├─ service     AlarmService (저장 이벤트 → 한계 비교), LimitCalculationService (UCL = 평균 + 3σ)
 │  └─ web         AlarmController (/api/alarms, /api/equipment-limits)
 ├─ monitoring     설비 현황 대시보드, 정지 사유 파레토
-│  ├─ push        DashboardPusher (저장·집계 이벤트 → 1초마다 /topic/dashboard로 전송)
+│  ├─ push        DashboardPusher (저장·집계·사유 확정 이벤트 → 1초마다 /topic/dashboard로 전송)
 │  ├─ mapper      MonitoringMapper (설비별 최신 상태, OUTER APPLY) → resources/mapper/monitoring/
 │  ├─ service     MonitoringService (공장 시계 기준 판단), DowntimeParetoService (비율, 80% 표시)
 │  └─ web         MonitoringController (/api/monitoring), MonitoringPageController (/monitoring, /monitoring/pareto 화면)
 └─ equipment      설비 데이터 수집
    ├─ domain      EquipmentData(원본), EquipmentStatusLog(상태 이력), Downtime(비가동)
    ├─ repository
-   ├─ service     EquipmentDataService (중복 확인, 저장), EquipmentStatusService (상태 전환 기록)
+   ├─ service     EquipmentDataService (중복 확인, 저장), EquipmentStatusService (상태 전환 기록), DowntimeService (POP 정지 사유 확정)
+   ├─ web         DowntimeController (POP 정지 목록, 사유 확정)
    └─ mqtt        MqttCollector (구독, 재접속), EquipmentMessage, MqttProperties
 ```
 
@@ -169,6 +174,8 @@ com.minimes
 | GET | `/api/operations/{woOpId}/results` | 공정의 실적 목록 (취소 포함) |
 | POST | `/api/operations/{woOpId}/complete` | 공정 완료 (마지막 공정이면 작업지시도 완료) |
 | POST | `/api/results/{resultId}/cancel` | 실적 취소 (`{"workerId":"W1001","reason":"수량 오입력"}`) |
+| GET | `/api/equipment/{equipCode}/downtimes?limit=10` | 설비가 남긴 최근 정지 (POP 정지 사유 입력) |
+| PUT | `/api/downtimes/{downtimeId}/reason` | 정지 사유 확정 (`{"workerId":"W1001","dtCat":"MATERIAL","dtSub":"MAT_NOT_RECEIVED","note":"..."}`) |
 | GET | `/api/monitoring/dashboard` | 설비 현황 (현재 상태, 정지 사유, 센서값, 오늘 OEE) |
 | GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
 | GET | `/api/oee/monthly?month=2025-10` | 설비별 월별 OEE (시간·수량 합산 후 계산) |
