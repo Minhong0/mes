@@ -1,0 +1,89 @@
+/* LOT 추적. 색과 글꼴은 monitoring.css, 조건 줄·표·타일은 pareto.css를 그대로 쓴다. */
+
+.filters input[type="search"] { min-width: 0; max-width: 100%; }
+.filters button[type="submit"] { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
+
+/* 상태 배지: ACTIVE(쓸 수 있음)만 진하게, 나머지는 옅게 */
+.status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: #fff;
+    background: var(--idle);
+}
+.status.ACTIVE { background: var(--run); }
+.status.HOLD { background: var(--setup); }
+.status.SHIPPED { background: var(--accent); }
+.status.SCRAPPED { background: var(--down); }
+.status.CONSUMED { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+
+/* 고른 LOT 한 장 */
+.lot-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.lot-no { margin: 0; font-size: 22px; font-variant-numeric: tabular-nums; word-break: break-all; }
+.lot-item { margin: 4px 0 12px; color: var(--muted); }
+.lot-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(160px, 100%), 1fr));
+    gap: 12px;
+    margin: 0;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+.lot-facts dt { color: var(--muted); font-size: 12px; }
+.lot-facts dd { margin: 2px 0 0; font-size: 15px; font-variant-numeric: tabular-nums; }
+
+/* 역방향·정방향 트리를 나란히. 좁은 화면에서는 위아래로 */
+.trees {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+    gap: 16px;
+    align-items: start;   /* 한쪽 트리가 짧아도 빈 칸을 늘이지 않는다 */
+}
+.tree-note { margin: -2px 0 8px; }
+.trees .panel { margin-bottom: 16px; min-width: 0; }
+
+/*
+ * 트리: 서버가 깊이 우선 순서(sort_path)로 준 줄을 그대로 쌓고, 단계(--level)만큼 들여 쓴다.
+ * 왼쪽 세로선은 단계마다 하나씩 그려 "어느 LOT 아래인지"를 눈으로 따라가게 한다.
+ */
+.tree { list-style: none; margin: 0; padding: 0; }
+.tree li {
+    --indent: 22px;
+    position: relative;
+    padding: 6px 0 6px calc(var(--level) * var(--indent));
+    border-bottom: 1px solid var(--line);
+}
+.tree li::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: calc(var(--level) * var(--indent) - 10px);
+    background: repeating-linear-gradient(to right,
+        transparent 0, transparent 8px, var(--line) 8px, var(--line) 9px, transparent 9px, transparent var(--indent));
+}
+.node-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.node-lot {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    word-break: break-all;
+    text-align: left;
+}
+.node-lot:hover { text-decoration: underline; }
+.node-qty { margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.node-sub { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.node-sub .rm { color: var(--text); font-weight: 600; }   /* 원자재: 회수 범위를 정할 때 가장 먼저 보는 줄 */
+
+.recent-lot { color: var(--accent); cursor: pointer; font-weight: 600; }
+#recent-rows tr:hover td { background: var(--bg); }
+.panel:has(#history-rows) { overflow-x: auto; }

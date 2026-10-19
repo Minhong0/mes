@@ -471,6 +471,13 @@ class MssqlIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("LOT_IN_USE"));
 
+        mockMvc.perform(get("/api/lots/{lotNo}", batch))
+                .andExpect(jsonPath("$.lastProcessName").value("열처리"))
+                .andExpect(jsonPath("$.history[0].eventType").value("PRODUCE"))
+                .andExpect(jsonPath("$.history[0].processName").value("열처리"));
+        mockMvc.perform(get("/lots/trace").param("lotNo", batch))
+                .andExpect(status().isOk());
+
         mockMvc.perform(get("/api/lots/{lotNo}", barB))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lot.qty").value(8.0))

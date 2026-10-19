@@ -14,6 +14,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /** LOT API의 요청·응답 형식. */
 public final class LotDtos {
@@ -38,18 +39,23 @@ public final class LotDtos {
         }
     }
 
-    public record HistoryResponse(String eventType, String processCode, BigDecimal qty, String equipCode,
-                                  String workerId, Long resultId, String note, LocalDateTime eventAt) {
-        public static HistoryResponse from(LotHistory h) {
-            return new HistoryResponse(h.getEventType().name(), h.getProcessCode(), h.getQty(), h.getEquipCode(),
-                    h.getWorkerId(), h.getResultId(), h.getNote(), h.getEventAt());
+    public record HistoryResponse(String eventType, String processCode, String processName, BigDecimal qty,
+                                  String equipCode, String workerId, Long resultId, String note, LocalDateTime eventAt) {
+        public static HistoryResponse from(LotHistory h, Map<String, String> processNames) {
+            return new HistoryResponse(h.getEventType().name(), h.getProcessCode(),
+                    h.getProcessCode() == null ? null : processNames.get(h.getProcessCode()), h.getQty(),
+                    h.getEquipCode(), h.getWorkerId(), h.getResultId(), h.getNote(), h.getEventAt());
         }
     }
 
-    public record LotDetailResponse(LotResponse lot, String itemName, List<HistoryResponse> history) {
+    /** lastProcessName: LOT을 만든 공정의 이름 (원자재 LOT은 null) */
+    public record LotDetailResponse(LotResponse lot, String itemName, String lastProcessName,
+                                    List<HistoryResponse> history) {
         public static LotDetailResponse from(LotDetail d) {
+            Map<String, String> names = d.processNames();
             return new LotDetailResponse(LotResponse.from(d.lot()), d.itemName(),
-                    d.history().stream().map(HistoryResponse::from).toList());
+                    d.lot().getLastProcess() == null ? null : names.get(d.lot().getLastProcess()),
+                    d.history().stream().map(h -> HistoryResponse.from(h, names)).toList());
         }
     }
 

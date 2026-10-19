@@ -14,7 +14,7 @@
         <h1>설비 현황</h1>
         <p class="sub">CNC01~05 · 공장 시계 <strong id="factory-now">-</strong> · 오늘 <strong id="prod-date">-</strong></p>
     </div>
-    <p class="refresh"><a class="nav" th:href="@{/monitoring/pareto}">정지 사유 파레토 →</a> · <span id="connection" class="connection">연결 중</span> · 마지막 갱신 <span id="refreshed-at">-</span></p>
+    <p class="refresh"><a class="nav" th:href="@{/monitoring/pareto}">정지 사유 파레토 →</a> · <a class="nav" th:href="@{/lots/trace}">LOT 추적 →</a> · <span id="connection" class="connection">연결 중</span> · 마지막 갱신 <span id="refreshed-at">-</span></p>
 </header>
 
 <!-- 서버에 연결할 수 없을 때만 보인다 (hidden 속성을 JS가 켜고 끈다) -->
@@ -23,7 +23,7 @@
 <!-- 설비 카드가 들어갈 자리. 처음엔 비어 있고 monitoring.js가 채운다 -->
 <main id="cards" class="cards"></main>
 
-<p class="note">품질(양품률)은 POP에서 불량을 입력하기 전까지 100%로 표시됩니다.</p>
+<p class="note">품질(양품률)은 POP에서 등록한 불량으로 계산합니다. 불량을 입력하지 않은 날은 100%입니다.</p>
 
 <!-- STOMP 클라이언트(@stomp/stompjs). CDN이 아니라 서버의 webjar에서 받는다: 공장 내부망은 인터넷이 막힌 경우가 많다 -->
 <script th:src="@{/webjars/stomp__stompjs/bundles/stomp.umd.min.js}"></script>

@@ -263,11 +263,13 @@ public class LotService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.LOT_NOT_FOUND, "LOT을 찾을 수 없습니다: " + lotNo));
     }
 
-    /** LOT 하나와 그 이력 (일어난 순서대로) */
+    /** LOT 하나와 그 이력 (일어난 순서대로). 화면에 공정 이름을 쓰도록 공정 코드 → 이름도 함께 */
     @Transactional(readOnly = true)
     public LotDetail detail(String lotNo) {
         Lot lot = get(lotNo);
-        return new LotDetail(lot, masterQueryService.getItem(lot.getItemCode()).getItemName(),
+        Map<String, String> processNames = masterQueryService.processMap().entrySet().stream()
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getProcessName()));
+        return new LotDetail(lot, masterQueryService.getItem(lot.getItemCode()).getItemName(), processNames,
                 historyRepository.findByLotNoOrderByEventAtAscHistoryIdAsc(lotNo));
     }
 
@@ -332,6 +334,6 @@ public class LotService {
     public record Trace(Lot lot, List<TraceNode> backward, List<TraceNode> forward) {
     }
 
-    public record LotDetail(Lot lot, String itemName, List<LotHistory> history) {
+    public record LotDetail(Lot lot, String itemName, Map<String, String> processNames, List<LotHistory> history) {
     }
 }

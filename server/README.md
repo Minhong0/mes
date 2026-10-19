@@ -55,6 +55,13 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
 4. 추적: `GET /api/lots/{lotNo}/trace`가 재귀 CTE로 역방향(이 LOT을 만든 재료, 원자재까지)과 정방향(이 LOT이 들어간 곳)을 함께 돌려줍니다. 취소한 실적의 계보는 뺍니다.
 5. 이력: `GET /api/lots/{lotNo}`에 입고·생산·투입·취소 이력이 일어난 순서대로 나옵니다.
 
+http://localhost:8080/lots/trace 는 LOT 추적 화면입니다.
+
+- LOT 번호를 넣거나, 품목을 골라 최근 LOT 목록에서 누릅니다. `?lotNo=SF-SFT-030-261019-001`처럼 주소에 LOT을 붙이면 바로 열립니다 (메신저로 링크를 보낼 수 있음).
+- LOT 카드, 회수 범위 숫자(들어간 원자재 LOT, 이 LOT이 들어간 LOT, 그중 아직 쓸 수 있는 LOT), 역방향·정방향 트리, 이력을 보여 줍니다.
+- 트리의 LOT 번호를 누르면 그 LOT으로 다시 추적하고, 브라우저 [뒤로]로 돌아갑니다.
+- 화면은 모니터링 화면처럼 빈 틀(`templates/lot-trace.html`)이고, `static/js/lot-trace.js`가 두 API를 불러 그립니다.
+
 LOT 추적을 넣기 전에 시작한 작업지시는 앞 공정 LOT이 없어 두 번째 공정부터 실적을 등록할 수 없습니다. 새 작업지시로 확인합니다.
 
 ## 진동·온도 관리한계 알람 (CBM)
@@ -147,7 +154,7 @@ com.minimes
 │  ├─ repository  LotRepository (투입 LOT 잠금 조회 포함)
 │  ├─ mapper      LotTraceMapper (정방향·역방향 재귀 CTE) → resources/mapper/lot/LotTraceMapper.xml
 │  ├─ service     LotService (공정에 투입할 품목, 투입 확인, 기록, 취소)
-│  └─ web         LotController (/api/lots, 공정 투입 LOT)
+│  └─ web         LotController (/api/lots, 공정 투입 LOT), LotPageController (/lots/trace 화면)
 ├─ production     일별 생산 실적 집계, OEE 조회
 │  ├─ domain      ProductionDaily (production_daily, 복합키)
 │  ├─ repository
@@ -201,7 +208,7 @@ com.minimes
 | PUT | `/api/downtimes/{downtimeId}/reason` | 정지 사유 확정 (`{"workerId":"W1001","dtCat":"MATERIAL","dtSub":"MAT_NOT_RECEIVED","note":"..."}`) |
 | POST | `/api/lots/receive` | 원자재 입고 (`{"itemCode":"RM-SCM-001","qty":100,"supplierLotNo":"A-1018","workerId":"W1001"}`) |
 | GET | `/api/lots?itemCode=RM-SCM-001&status=ACTIVE` | 품목의 LOT 목록 (최근 100개) |
-| GET | `/api/lots/{lotNo}` | LOT과 이력 |
+| GET | `/api/lots/{lotNo}` | LOT과 이력 (공정 이름 포함) |
 | GET | `/api/lots/{lotNo}/trace` | 역방향(`backward`)·정방향(`forward`) 추적 |
 | GET | `/api/monitoring/dashboard` | 설비 현황 (현재 상태, 정지 사유, 센서값, 오늘 OEE) |
 | GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
