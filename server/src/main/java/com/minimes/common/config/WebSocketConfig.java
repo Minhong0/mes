@@ -12,7 +12,7 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  *   /ws          브라우저가 WebSocket으로 접속하는 주소
  *   /topic/...   서버가 보내는 주제. 구독한 화면 모두에게 같은 메시지가 간다
  *
- * 브로커는 Spring에 들어 있는 간단한 메모리 브로커를 쓴다. 서버를 여러 대로 늘리면 RabbitMQ 같은 외부 브로커로 바꿔야 한다.
+ * 브로커는 Spring에 들어 있는 메모리 브로커를 쓴다.
  */
 @Configuration
 @EnableWebSocketMessageBroker

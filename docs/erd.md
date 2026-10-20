@@ -40,6 +40,7 @@ erDiagram
         varchar output_item_code FK
         decimal std_time_min
         varchar time_basis "EA, BATCH"
+        int lot_size "산출 LOT 최대 수량 (포장 20)"
     }
     EQUIPMENT {
         varchar equip_code PK

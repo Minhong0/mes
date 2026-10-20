@@ -42,7 +42,7 @@ public sealed class DowntimeHistory
             .ToList();
 
         var eventsByEquip = rows
-            .GroupBy(cols => cols[equip])   // Java Stream의 Collectors.groupingBy와 같다
+            .GroupBy(cols => cols[equip])
             .ToDictionary(
                 group => group.Key,
                 group => group.Select(cols => new DowntimeEvent(

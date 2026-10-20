@@ -101,11 +101,26 @@ public sealed class FakeMesApi : IMesApi
         var defects = request.Defects.Sum(d => d.Qty);
         var result = new WorkResult(Saved.Count + 1, 11, request.EquipCode, request.WorkerId, DateTime.Today, DateTime.Now,
             request.GoodQty, defects, false, null, request.Defects,
-            request.GoodQty > 0 ? $"SF-SFT-010-261017-{Saved.Count + 1:000}" : null, request.Inputs);
+            OutputLots(request.GoodQty), request.Inputs);
         Saved.Add(result);
         _byRequest[request.RequestId] = result;
         Operation = Operation with { GoodQty = Operation.GoodQty + request.GoodQty, DefectQty = Operation.DefectQty + defects };
         return result;
+    }
+
+    /// <summary>산출 LOT 크기. 정하면 양품을 이 크기씩 나눈 LOT 번호를 돌려준다 (포장)</summary>
+    public int? LotSize { get; set; }
+
+    private int _lotSeq;
+
+    private List<string> OutputLots(int good)
+    {
+        var lots = new List<string>();
+        for (var left = good; left > 0; left -= LotSize ?? left)
+        {
+            lots.Add($"SF-SFT-010-261017-{++_lotSeq:000}");
+        }
+        return lots;
     }
 
     public Task<OperationState> CompleteAsync(long woOpId, string workerId)

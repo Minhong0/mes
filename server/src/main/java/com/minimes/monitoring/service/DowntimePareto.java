@@ -15,7 +15,7 @@ import java.util.List;
 public record DowntimePareto(LocalDate from, LocalDate to, String equipCode, boolean byReason,
                              int totalMin, int stopCount, List<Item> items) {
 
-    /** 누적 비율이 이 값에 이를 때까지의 사유를 "중점 관리 대상"으로 표시한다 (80/20 법칙) */
+    /** 누적 비율이 이 값에 이를 때까지의 사유를 "중점 관리 대상"으로 표시한다 */
     public static final BigDecimal VITAL_FEW_PERCENT = BigDecimal.valueOf(80);
 
     /**

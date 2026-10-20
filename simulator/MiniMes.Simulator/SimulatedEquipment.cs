@@ -11,7 +11,7 @@ namespace MiniMes.Simulator;
 /// </summary>
 public sealed class SimulatedEquipment
 {
-    // 진동이 먼저 나빠지는 고장 사유. 이 고장이 다가오면 진동·온도가 오른다 (예방보전 CBM 알람의 근거).
+    // 진동이 먼저 나빠지는 고장 사유. 이 고장이 다가오면 진동·온도가 오른다.
     private static readonly HashSet<string> VibrationFailures = ["BRK_SPINDLE", "BRK_BEARING"];
 
     // 고장 징후가 나타나기 시작하는 시점: 정지 몇 분 전부터 (시뮬레이션 분)
@@ -51,7 +51,7 @@ public sealed class SimulatedEquipment
         _runId = runId;
         _random = new Random(seed);   // 설비마다 다른 seed: 5대가 똑같이 움직이지 않게
 
-        // 평균 정지 간격 = 관측 기간에 실제로 가동한 시간 ÷ 정지 횟수 (보전 지표 MTBF와 같은 개념)
+        // 평균 정지 간격 = 관측 기간에 실제로 가동한 시간 ÷ 정지 횟수
         // 정지 중인 시간은 빼야 한다. 다음 정지는 이번 정지가 끝난 뒤부터 세기 때문이다.
         // 예: CNC03 = (23일 × 960분 − 정지 3,388분) ÷ 66건 ≈ 283분 가동마다 한 번
         var observedMinutes = (double)history.ObservedDays * spec.PlannedMinutesPerDay;
@@ -89,7 +89,7 @@ public sealed class SimulatedEquipment
 
     /// <summary>
     /// 다음 정지를 미리 정한다.
-    /// - 시각: 평균 간격을 가진 지수분포에서 뽑는다. "언제 일어날지 모르는 사건"이 평균적으로 일정 빈도로 일어날 때 쓰는 분포다.
+    /// - 시각: 평균 간격을 가진 지수분포에서 뽑는다.
     /// - 내용: 과거 정지 기록 중 하나를 고른다. 자주 있었던 사유가 자주 뽑히므로 사유별 빈도도 자연스럽게 재현된다.
     /// </summary>
     private void ScheduleNextStop()
@@ -155,7 +155,7 @@ public sealed class SimulatedEquipment
             Status: _status,
             SpindleVibration: vibration,
             SpindleTemp: temp,
-            DowntimeCategory: _currentStop?.Category,   // ?. : _currentStop이 null이면 결과도 null
+            DowntimeCategory: _currentStop?.Category,
             DowntimeReason: _currentStop?.Reason);
 
         _publisher.Enqueue(message);   // 버퍼에 적기만 한다. 실제 전송은 MqttPublisher가 따로 한다
@@ -169,7 +169,7 @@ public sealed class SimulatedEquipment
     /// - 가동 중: 진동 1.0~1.5, 온도 35~38. 고장이 다가오면 진동은 최대 +3.0, 온도는 최대 +10까지 오른다.
     /// - 정지 중: 스핀들이 멈춰 진동 0~0.1, 온도 28~30.
     /// </summary>
-    private (double Vibration, double Temp) ReadSensors()   // 튜플: 값 두 개를 한 번에 돌려준다
+    private (double Vibration, double Temp) ReadSensors()
     {
         if (_status != "RUN")
         {

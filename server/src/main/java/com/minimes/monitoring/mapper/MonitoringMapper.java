@@ -7,10 +7,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * 모니터링 화면용 조회. SQL은 resources/mapper/monitoring/MonitoringMapper.xml에 있다.
- * 화면 하나를 그리는 데 테이블 다섯 개가 필요해서, JPA 엔티티를 여러 번 조회하는 대신 SQL 한 번으로 모은다.
- */
+/** 모니터링 화면용 조회. SQL은 resources/mapper/monitoring/MonitoringMapper.xml에 있다. */
 @Mapper
 public interface MonitoringMapper {
 

@@ -39,7 +39,7 @@ public class MqttCollector implements SmartLifecycle, MqttCallbackExtended {
 
     private static final int QOS_AT_LEAST_ONCE = 1;
 
-    // 처음 접속 재시도 대기: 1초에서 시작해 실패할 때마다 두 배, 최대 30초 (시뮬레이터와 같은 지수 백오프)
+    // 처음 접속 재시도 대기: 1초에서 시작해 실패할 때마다 두 배, 최대 30초
     private static final Duration FIRST_RETRY_DELAY = Duration.ofSeconds(1);
     private static final Duration MAX_RETRY_DELAY = Duration.ofSeconds(30);
 
@@ -49,7 +49,7 @@ public class MqttCollector implements SmartLifecycle, MqttCallbackExtended {
 
     private MqttClient client;
     private Thread connectThread;
-    private volatile boolean running;   // volatile: 다른 스레드(접속 스레드)가 바뀐 값을 바로 보도록 무조건 메인 메모리에 저장
+    private volatile boolean running;   // 접속 스레드도 읽는다
 
     // ── 시작과 종료: Spring이 모든 빈을 만든 뒤 start(), 종료할 때 stop()을 부른다 (SmartLifecycle) ──
 
@@ -146,7 +146,7 @@ public class MqttCollector implements SmartLifecycle, MqttCallbackExtended {
     }
 
     /**
-     * 메시지 한 건 처리. 테스트에서 브로커 없이 부를 수 있도록 Paho 콜백과 분리했다.
+     * 메시지 한 건 처리.
      *
      * 오류를 두 종류로 나눈다.
      * - 메시지 자체가 잘못됨(JSON 깨짐, 필수 값 없음): 다시 받아도 똑같이 실패하므로 기록만 하고 버린다.

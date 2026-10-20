@@ -114,7 +114,7 @@ class LotFlowTest {
     }
 
     String outputOf(WorkResult result) {
-        return lotService.resultLots(List.of(result.getResultId())).get(result.getResultId()).outputLotNo();
+        return lotService.resultLots(List.of(result.getResultId())).get(result.getResultId()).outputLotNos().getFirst();
     }
 
     Lot lot(String lotNo) {
@@ -300,7 +300,7 @@ class LotFlowTest {
 
         assertThat(lotService.resultLots(List.of(result.getResultId())).get(result.getResultId()))
                 .satisfies(l -> {
-                    assertThat(l.outputLotNo()).isNull();
+                    assertThat(l.outputLotNos()).isEmpty();
                     assertThat(l.inputs()).extracting(LotInput::lotNo).containsExactly(rm.getLotNo());
                 });
         assertThat(lot(rm.getLotNo()).getQty()).isEqualByComparingTo("3");

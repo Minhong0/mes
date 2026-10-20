@@ -28,7 +28,7 @@ public class Worker {
 
     private String role;            // ADMIN, OPERATOR, QC
 
-    /** 사용 여부 (Y/N). DB 타입이 CHAR(1)이라 Equipment.autoCollect처럼 타입을 명시한다. */
+    /** 사용 여부 (Y/N). DB 타입이 CHAR(1)이라 타입을 명시한다. */
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(length = 1)
     private String useYn;

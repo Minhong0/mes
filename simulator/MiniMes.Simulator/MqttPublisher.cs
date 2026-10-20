@@ -98,7 +98,7 @@ public sealed class MqttPublisher : IAsyncDisposable
     /// <summary>버퍼가 빌 때까지 가장 오래된 메시지부터 보낸다. 실패하면 예외가 RunAsync로 올라가 재연결한다.</summary>
     private async Task SendBufferedAsync(CancellationToken ct)
     {
-        while (_buffer.PeekOldest() is { } item)   // 패턴 매칭: null이 아니면 item에 담고 반복
+        while (_buffer.PeekOldest() is { } item)   // 버퍼가 빌 때까지
         {
             var mqttMessage = new MqttApplicationMessageBuilder()
                 .WithTopic(item.Topic)

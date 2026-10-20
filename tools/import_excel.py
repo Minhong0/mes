@@ -65,7 +65,7 @@ MASTER_TABLES = [
 # CSV에서 숫자로 넣을 컬럼. 나머지는 문자열로 넣는다.
 NUMERIC_COLUMNS = {
     "qty", "std_time_min", "batch_max_qty", "setup_time_min", "workers", "install_year",
-    "ideal_ct_min", "planned_min_per_day", "nominal", "lsl", "usl", "sort_order",
+    "ideal_ct_min", "planned_min_per_day", "nominal", "lsl", "usl", "sort_order", "lot_size",
 }
 
 # 한글이 들어갈 수 있는 컬럼은 N'...'(NVARCHAR)로 넣는다.

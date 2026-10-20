@@ -41,7 +41,7 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
 
 8. 실적에는 투입한 LOT(`inputs`)을 함께 보냅니다. 아래 LOT 추적을 참고하세요.
 
-이미 만든 DB에는 `db/ddl/07_work_result_request.sql`, `db/ddl/08_downtime_reason.sql`, `db/ddl/09_lot_tracking.sql`, `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
+이미 만든 DB에는 `db/ddl/07_work_result_request.sql`, `db/ddl/08_downtime_reason.sql`, `db/ddl/09_lot_tracking.sql`, `db/ddl/10_routing_lot_size.sql`, `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
 
 ## LOT 추적
 
@@ -51,7 +51,9 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
    - 품목마다 투입 수량의 합이 (양품 + 불량) × 1개당 투입 수량과 같아야 합니다.
    - 서버는 투입 LOT을 줄이고(0이 되면 `CONSUMED`), 양품 수량으로 산출 LOT을 만들고, 투입 → 산출을 `lot_genealogy`에 잇습니다. 실적과 같은 트랜잭션이라 하나라도 틀리면 실적도 저장되지 않습니다.
    - 투입 LOT은 `UPDLOCK`으로 잠그고 읽어, 두 단말이 같은 LOT을 동시에 줄이지 못하게 합니다.
-3. 실적 취소: 만든 LOT은 폐기(`SCRAPPED`)하고 투입 수량을 돌려줍니다. 만든 LOT을 이미 다음 공정에 썼으면 409 `LOT_IN_USE` (뒤 공정의 실적부터 취소).
+   - 포장 분할: 라우팅에 LOT 크기(`routing.lot_size`)가 있으면 양품을 그 크기씩 여러 LOT으로 나눕니다. 조립·포장(OP-70)은 20구 트레이라 20입니다. 예: 양품 45 → 20, 20, 5. 응답의 `outputLotNos`에 모두 나옵니다.
+   - 나눌 때 계보는 투입 LOT을 적은 순서대로 꺼내 산출 LOT을 앞에서부터 채웁니다. 불량 몫은 마지막 LOT에 붙어, 투입 LOT마다 이은 수량의 합이 투입 수량과 같습니다.
+3. 실적 취소: 만든 LOT(나눴으면 모두)은 폐기(`SCRAPPED`)하고 투입 수량을 돌려줍니다. 만든 LOT을 이미 다음 공정에 썼으면 409 `LOT_IN_USE` (뒤 공정의 실적부터 취소).
 4. 추적: `GET /api/lots/{lotNo}/trace`가 재귀 CTE로 역방향(이 LOT을 만든 재료, 원자재까지)과 정방향(이 LOT이 들어간 곳)을 함께 돌려줍니다. 취소한 실적의 계보는 뺍니다.
 5. 이력: `GET /api/lots/{lotNo}`에 입고·생산·투입·취소 이력이 일어난 순서대로 나옵니다.
 
@@ -199,7 +201,7 @@ com.minimes
 | GET | `/api/workers/{workerId}` | 작업자 확인 (POP 로그인) |
 | GET | `/api/work-centers/{wcCode}/operations` | 작업장의 대기·진행 중인 공정 (POP 작업 목록) |
 | POST | `/api/operations/{woOpId}/start` | 공정 시작 (`{"workerId":"W1001"}`) |
-| POST | `/api/operations/{woOpId}/results` | 실적 등록 (`requestId`, `workerId`, `equipCode`, `goodQty`, `defects[]`, `inputs[]`). 응답에 만든 LOT(`outputLotNo`) |
+| POST | `/api/operations/{woOpId}/results` | 실적 등록 (`requestId`, `workerId`, `equipCode`, `goodQty`, `defects[]`, `inputs[]`). 응답에 만든 LOT(`outputLotNos`, 포장은 여러 개) |
 | GET | `/api/operations/{woOpId}/input-lots` | 공정에 투입할 품목과 쓸 수 있는 LOT (먼저 들어온 것부터) |
 | GET | `/api/operations/{woOpId}/results` | 공정의 실적 목록 (취소 포함) |
 | POST | `/api/operations/{woOpId}/complete` | 공정 완료 (마지막 공정이면 작업지시도 완료) |

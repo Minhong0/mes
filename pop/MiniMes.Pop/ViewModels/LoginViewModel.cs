@@ -4,7 +4,7 @@ using MiniMes.Pop.Api;
 
 namespace MiniMes.Pop.ViewModels;
 
-/// <summary>사번으로 작업자를 확인한다. 현장에서는 보통 사원증 바코드를 찍으면 사번이 입력된다.</summary>
+/// <summary>사번으로 작업자를 확인한다.</summary>
 public partial class LoginViewModel(IMesApi api, Action<Worker> onLoggedIn) : ObservableObject
 {
     [ObservableProperty]

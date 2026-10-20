@@ -3,7 +3,7 @@
 <mapper namespace="com.minimes.lot.mapper.LotTraceMapper">
 
     <!--
-        LOT 추적: lot_genealogy(투입 → 산출)를 재귀 CTE로 따라간다. BOM 전개(BomMapper.xml)와 같은 모양이다.
+        LOT 추적: lot_genealogy(투입 → 산출)를 재귀 CTE로 따라간다.
         1) links: 취소한 실적이 만든 줄을 뺀 계보. 계보는 지우지 않으므로 여기서 거른다.
            (재귀 부분 안에서는 LEFT JOIN을 쓸 수 없어 먼저 따로 만든다)
         2) 앵커: 시작 LOT과 바로 이어진 LOT들 (Level 1)

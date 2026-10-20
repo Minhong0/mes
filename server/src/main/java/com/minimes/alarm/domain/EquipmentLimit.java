@@ -18,7 +18,6 @@ import java.time.LocalDateTime;
 /**
  * 설비·센서 항목별 관리한계. 테이블: equipment_limit
  * 기준 기간의 가동 데이터로 계산한다: UCL = 평균 + 3σ.
- * 정상일 때 값의 99.87%가 UCL 아래에 있으므로, UCL을 넘는 값은 "평소와 다른 일"이 생겼다는 신호로 본다.
  */
 @Entity
 @Table(name = "equipment_limit")

@@ -17,7 +17,7 @@ public record EquipmentSpec(string EquipCode, string EquipName, double IdealCycl
     {
         var lines = File.ReadAllLines(path);
         var header = lines[0].Split(',');
-        int Col(string name) => Array.IndexOf(header, name);   // 지역 함수: 헤더 이름 → 컬럼 번호
+        int Col(string name) => Array.IndexOf(header, name);   // 헤더 이름 → 컬럼 번호
 
         int code = Col("equip_code"), name = Col("equip_name"), ct = Col("ideal_ct_min"),
             planned = Col("planned_min_per_day"), auto = Col("auto_collect");

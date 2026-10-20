@@ -5,7 +5,7 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
--- 설비·일자별 OEE (%). 산식은 부트캠프 2차 자료의 OEE 산출 기준과 같다.
+-- 설비·일자별 OEE (%).
 CREATE OR ALTER VIEW v_oee_daily AS
 SELECT
     prod_date,
@@ -21,7 +21,7 @@ FROM production_daily;
 GO
 
 -- 설비·월별 OEE (%).
--- 일별 OEE를 평균하지 않고 시간과 수량을 먼저 합산한 뒤 계산한다 (2차 자료 STEP 4 방식).
+-- 일별 OEE를 평균하지 않고 시간과 수량을 먼저 합산한 뒤 계산한다.
 CREATE OR ALTER VIEW v_oee_monthly AS
 WITH m AS (
     SELECT

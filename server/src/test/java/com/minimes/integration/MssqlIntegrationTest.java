@@ -96,7 +96,9 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(7))
                 .andExpect(jsonPath("$[2].processCode").value("OP-30"))
                 .andExpect(jsonPath("$[2].processName").value("열처리"))
-                .andExpect(jsonPath("$[2].timeBasis").value("BATCH"));
+                .andExpect(jsonPath("$[2].timeBasis").value("BATCH"))
+                .andExpect(jsonPath("$[2].lotSize").doesNotExist())
+                .andExpect(jsonPath("$[6].lotSize").value(20));   // 조립·포장은 20개 트레이로 나눈다
     }
 
     @Test
@@ -462,7 +464,7 @@ class MssqlIntegrationTest {
 
         // 다음 공정에 쓴 LOT의 실적은 취소할 수 없다
         String results = mockMvc.perform(get("/api/operations/{id}/results", op20))
-                .andExpect(jsonPath("$[0].outputLotNo").value(m2))
+                .andExpect(jsonPath("$[0].outputLotNos[0]").value(m2))
                 .andExpect(jsonPath("$[0].inputs[0].lotNo").value(t2))
                 .andReturn().getResponse().getContentAsString();
         int m2Result = JsonPath.read(results, "$[0].resultId");
@@ -505,7 +507,7 @@ class MssqlIntegrationTest {
                         .content(reportJson(good, defect, lotsAndQty)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return JsonPath.read(body, "$.outputLotNo");
+        return JsonPath.read(body, "$.outputLotNos[0]");
     }
 
     private static String reportJson(int good, int defect, Object... lotsAndQty) {

@@ -20,10 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-/**
- * 상태 변경은 PATCH /status 대신 동작 이름(start, complete, close)으로 나눴다.
- * 동작마다 허용되는 이전 상태가 달라서, URL만 보고도 무슨 일을 하는지 알 수 있게 하기 위해서다.
- */
+/** 작업지시 API. 상태 변경은 동작 이름(start, complete, close)으로 나뉜다. */
 @Tag(name = "작업지시", description = "작업지시 생성, 조회, 상태 변경 (대기 → 진행 → 완료 → 마감)")
 @RestController
 @RequestMapping("/api/work-orders")

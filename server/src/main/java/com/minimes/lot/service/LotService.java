@@ -15,6 +15,7 @@ import com.minimes.lot.repository.LotRepository;
 import com.minimes.master.domain.Bom;
 import com.minimes.master.domain.Item;
 import com.minimes.master.domain.ItemType;
+import com.minimes.master.domain.Routing;
 import com.minimes.master.domain.RoutingId;
 import com.minimes.master.repository.BomRepository;
 import com.minimes.master.repository.RoutingRepository;
@@ -27,10 +28,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -177,10 +180,14 @@ public class LotService {
                         .formatted(r.itemCode(), plain(needQty), plain(given)));
             }
         }
-        return new InputPlan(op, outputItemOf(op.getWorkOrder(), op.getSeq()), planned);
+        Routing routing = routingOf(op.getWorkOrder(), op.getSeq());
+        return new InputPlan(op, routing.getOutputItemCode(), routing.getLotSize(), units, planned);
     }
 
-    /** 저장한 실적으로 투입 LOT을 줄이고, 양품이 있으면 산출 LOT을 만들어 계보에 잇는다. */
+    /**
+     * 저장한 실적으로 투입 LOT을 줄이고, 양품이 있으면 산출 LOT을 만들어 계보에 잇는다.
+     * 라우팅에 LOT 크기(lot_size)가 있고 양품이 그보다 많으면 그 크기씩 여러 LOT으로 나눈다 (포장: 20개 트레이).
+     */
     public ResultLots record(InputPlan plan, WorkResult result) {
         WorkOrderOperation op = plan.operation();
         LocalDateTime now = result.getEndedAt();
@@ -190,19 +197,71 @@ public class LotService {
                     result.getEquipCode(), result.getWorkerId(), result.getResultId(), null, now));
         }
         List<LotInput> inputs = plan.inputs().stream().map(p -> new LotInput(p.lot().getLotNo(), p.qty())).toList();
-        if (result.getGoodQty() == 0) {
-            return new ResultLots(null, inputs);   // 모두 불량: 투입만 하고 만든 LOT은 없다
+        List<Integer> sizes = splitSizes(result.getGoodQty(), plan.lotSize());
+        List<Lot> outputs = new ArrayList<>();
+        for (int i = 0; i < sizes.size(); i++) {
+            Lot output = lotRepository.save(Lot.produce(nextLotNo(plan.outputItemCode(), now.toLocalDate()),
+                    plan.outputItemCode(), BigDecimal.valueOf(sizes.get(i)), op.getWorkOrder().getWoNo(),
+                    op.getProcessCode(), result.getWorkerId(), now));
+            String note = sizes.size() > 1 ? "분할 %d/%d".formatted(i + 1, sizes.size()) : null;
+            historyRepository.save(LotHistory.of(output.getLotNo(), LotEventType.PRODUCE, output.getQty(),
+                    op.getProcessCode(), result.getEquipCode(), result.getWorkerId(), result.getResultId(), note, now));
+            outputs.add(output);
         }
-        Lot output = lotRepository.save(Lot.produce(nextLotNo(plan.outputItemCode(), now.toLocalDate()),
-                plan.outputItemCode(), BigDecimal.valueOf(result.getGoodQty()), op.getWorkOrder().getWoNo(),
-                op.getProcessCode(), result.getWorkerId(), now));
-        historyRepository.save(LotHistory.of(output.getLotNo(), LotEventType.PRODUCE, output.getQty(), op.getProcessCode(),
-                result.getEquipCode(), result.getWorkerId(), result.getResultId(), null, now));
-        for (PlannedInput p : plan.inputs()) {
-            genealogyRepository.save(LotGenealogy.link(p.lot().getLotNo(), output.getLotNo(), p.qty(), op.getProcessCode(),
-                    result.getResultId(), now));
+        linkInputs(plan, outputs, result, now);
+        return new ResultLots(outputs.stream().map(Lot::getLotNo).toList(), inputs);
+    }
+
+    /** 양품 수량을 LOT 크기씩 나눈다. 예: 45개, 크기 20 → [20, 20, 5]. 양품이 0이면 빈 목록(모두 불량: 만든 LOT 없음). */
+    static List<Integer> splitSizes(int good, Integer lotSize) {
+        if (good == 0) {
+            return List.of();
         }
-        return new ResultLots(output.getLotNo(), inputs);
+        if (lotSize == null || good <= lotSize) {
+            return List.of(good);
+        }
+        List<Integer> sizes = new ArrayList<>();
+        for (int left = good; left > 0; left -= lotSize) {
+            sizes.add(Math.min(lotSize, left));
+        }
+        return sizes;
+    }
+
+    /**
+     * 계보: 품목마다 투입 LOT을 적은 순서대로 꺼내 산출 LOT을 앞에서부터 채운다.
+     * 산출 LOT 하나에는 (그 LOT의 수량 × 1개당 투입 수량)만큼, 마지막 LOT에는 남은 것을 모두 잇는다.
+     * 불량이 난 몫은 어느 LOT에 들어갔는지 알 수 없어 마지막 LOT에 붙는다. 그래서 투입 LOT마다 이은 수량의 합은 투입 수량과 같다.
+     */
+    private void linkInputs(InputPlan plan, List<Lot> outputs, WorkResult result, LocalDateTime now) {
+        if (outputs.isEmpty()) {
+            return;
+        }
+        Map<String, List<PlannedInput>> byItem = new LinkedHashMap<>();
+        plan.inputs().forEach(p -> byItem.computeIfAbsent(p.lot().getItemCode(), k -> new ArrayList<>()).add(p));
+        for (List<PlannedInput> group : byItem.values()) {
+            BigDecimal total = group.stream().map(PlannedInput::qty).reduce(BigDecimal.ZERO, BigDecimal::add);
+            ArrayDeque<PlannedInput> queue = new ArrayDeque<>(group);
+            BigDecimal leftInHead = queue.peekFirst().qty();
+            BigDecimal linked = BigDecimal.ZERO;
+            for (int i = 0; i < outputs.size(); i++) {
+                Lot output = outputs.get(i);
+                BigDecimal share = i == outputs.size() - 1
+                        ? total.subtract(linked)
+                        : output.getQty().multiply(total).divide(BigDecimal.valueOf(plan.units()), 3, RoundingMode.HALF_UP);
+                linked = linked.add(share);
+                while (share.signum() > 0 && !queue.isEmpty()) {
+                    BigDecimal take = share.min(leftInHead);
+                    genealogyRepository.save(LotGenealogy.link(queue.peekFirst().lot().getLotNo(), output.getLotNo(), take,
+                            plan.operation().getProcessCode(), result.getResultId(), now));
+                    share = share.subtract(take);
+                    leftInHead = leftInHead.subtract(take);
+                    if (leftInHead.signum() == 0) {
+                        queue.pollFirst();
+                        leftInHead = queue.isEmpty() ? BigDecimal.ZERO : queue.peekFirst().qty();
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -241,11 +300,11 @@ public class LotService {
         if (resultIds.isEmpty()) {
             return Map.of();
         }
-        Map<Long, String> outputs = new HashMap<>();
+        Map<Long, List<String>> outputs = new HashMap<>();
         Map<Long, List<LotInput>> inputs = new LinkedHashMap<>();
         for (LotHistory e : historyRepository.findByResultIdInAndEventTypeInOrderByHistoryId(resultIds, RESULT_EVENTS)) {
             if (e.getEventType() == LotEventType.PRODUCE) {
-                outputs.put(e.getResultId(), e.getLotNo());
+                outputs.computeIfAbsent(e.getResultId(), id -> new ArrayList<>()).add(e.getLotNo());
             } else {
                 inputs.computeIfAbsent(e.getResultId(), id -> new ArrayList<>()).add(new LotInput(e.getLotNo(), e.getQty()));
             }
@@ -253,7 +312,8 @@ public class LotService {
         Map<Long, ResultLots> lots = new HashMap<>();
         Set<Long> ids = new HashSet<>(outputs.keySet());
         ids.addAll(inputs.keySet());
-        ids.forEach(id -> lots.put(id, new ResultLots(outputs.get(id), inputs.getOrDefault(id, List.of()))));
+        ids.forEach(id -> lots.put(id,
+                new ResultLots(outputs.getOrDefault(id, List.of()), inputs.getOrDefault(id, List.of()))));
         return lots;
     }
 
@@ -305,11 +365,14 @@ public class LotService {
         return lotNo;
     }
 
-    private String outputItemOf(WorkOrder wo, int seq) {
+    private Routing routingOf(WorkOrder wo, int seq) {
         return routingRepository.findById(new RoutingId(wo.getItemCode(), seq))
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROUTING_NOT_FOUND,
-                        "라우팅을 찾을 수 없습니다: %s %d".formatted(wo.getItemCode(), seq)))
-                .getOutputItemCode();
+                        "라우팅을 찾을 수 없습니다: %s %d".formatted(wo.getItemCode(), seq)));
+    }
+
+    private String outputItemOf(WorkOrder wo, int seq) {
+        return routingOf(wo, seq).getOutputItemCode();
     }
 
     private static String plain(BigDecimal v) {
@@ -324,8 +387,14 @@ public class LotService {
     public record InputCandidates(RequiredInput required, String itemName, List<Lot> lots) {
     }
 
-    /** 확인을 마친 투입 계획. planInputs가 만들고 record가 쓴다. */
-    public record InputPlan(WorkOrderOperation operation, String outputItemCode, List<PlannedInput> inputs) {
+    /**
+     * 확인을 마친 투입 계획. planInputs가 만들고 record가 쓴다.
+     *
+     * @param lotSize 산출 LOT 하나의 최대 수량 (null이면 나누지 않는다)
+     * @param units   양품 + 불량
+     */
+    public record InputPlan(WorkOrderOperation operation, String outputItemCode, Integer lotSize, int units,
+                            List<PlannedInput> inputs) {
     }
 
     public record PlannedInput(Lot lot, BigDecimal qty) {

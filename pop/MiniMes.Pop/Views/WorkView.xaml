@@ -313,11 +313,11 @@
                                                                 <Run Text="{Binding EquipCode, Mode=OneWay}" />
                                                             </TextBlock>
                                                             <!-- 양품으로 만든 LOT (모두 불량이거나 LOT 추적 전의 실적이면 없음) -->
-                                                            <TextBlock FontSize="14" Text="{Binding OutputLotNo, StringFormat=→ LOT {0}}">
+                                                            <TextBlock FontSize="14" TextWrapping="Wrap" Text="{Binding OutputLotText, StringFormat=→ LOT {0}}">
                                                                 <TextBlock.Style>
                                                                     <Style TargetType="TextBlock" BasedOn="{StaticResource MutedText}">
                                                                         <Style.Triggers>
-                                                                            <DataTrigger Binding="{Binding OutputLotNo}" Value="{x:Null}">
+                                                                            <DataTrigger Binding="{Binding OutputLotText}" Value="{x:Null}">
                                                                                 <Setter Property="Visibility" Value="Collapsed" />
                                                                             </DataTrigger>
                                                                         </Style.Triggers>

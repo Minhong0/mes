@@ -49,6 +49,9 @@ public class Routing {
     @Column(precision = 10, scale = 2)
     private BigDecimal setupTimeMin;
 
+    /** 이 공정에서 만드는 LOT 하나의 최대 수량. 양품이 더 많으면 나눈다 (포장 트레이). null이면 나누지 않는다 */
+    private Integer lotSize;
+
     public enum TimeBasis { EA, BATCH }
 
     public static Routing of(String itemCode, int seq, String processCode, String wcCode, String outputItemCode,

@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/** 알람 API의 요청·응답. 엔티티를 그대로 내보내지 않고, 화면에 필요한 값만 담는다. */
+/** 알람 API의 요청·응답. */
 public final class AlarmDtos {
 
     private AlarmDtos() {

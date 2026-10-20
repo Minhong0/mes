@@ -51,7 +51,7 @@
 </section>
 
 <section class="panel">
-    <!-- 두 차트는 x 위치가 같다: 위는 누적 비율(%), 아래는 사유별 정지 시간(분). 단위가 다른 두 값을 한 축에 겹치지 않는다 -->
+    <!-- 두 차트는 x 위치가 같다: 위는 누적 비율(%), 아래는 사유별 정지 시간(분) -->
     <h2 class="chart-title">누적 비율 <small>— 빨간 점선이 80%</small></h2>
     <div class="chart-box cumulative"><canvas id="chart-cumulative" aria-label="누적 비율" role="img"></canvas></div>
     <h2 class="chart-title">사유별 정지 시간 (분)</h2>
@@ -72,7 +72,7 @@
     </table>
 </section>
 
-<!-- Chart.js: 막대·선 차트 라이브러리. STOMP와 같이 webjar로 서버에서 받는다 -->
+<!-- Chart.js: 막대·선 차트 라이브러리. webjar로 서버에서 받는다 -->
 <script th:src="@{/webjars/chart.js/dist/chart.umd.min.js}"></script>
 <script th:src="@{/js/pareto.js}"></script>
 </body>

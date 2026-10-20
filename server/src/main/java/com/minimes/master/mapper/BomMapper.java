@@ -4,10 +4,7 @@ import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
 
-/**
- * BOM 전개 쿼리. SQL은 resources/mapper/master/BomMapper.xml에 있다.
- * 재귀 CTE처럼 SQL을 직접 써야 읽기 쉬운 쿼리는 JPA 대신 MyBatis로 작성한다.
- */
+/** BOM 전개 쿼리. SQL은 resources/mapper/master/BomMapper.xml에 있다. */
 @Mapper
 public interface BomMapper {
 

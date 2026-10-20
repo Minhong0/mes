@@ -9,10 +9,7 @@ import com.minimes.master.domain.Routing;
 
 import java.math.BigDecimal;
 
-/**
- * 기준정보 API 응답 형식.
- * 엔티티를 그대로 내보내지 않고 응답용 record로 바꾼다. 엔티티 필드가 바뀌어도 API 형식이 흔들리지 않게 하기 위해서다.
- */
+/** 기준정보 API 응답 형식. */
 public final class MasterResponses {
 
     private MasterResponses() {
@@ -28,11 +25,11 @@ public final class MasterResponses {
 
     public record RoutingResponse(int seq, String processCode, String processName, String wcCode,
                                   String outputItemCode, BigDecimal stdTimeMin, String timeBasis,
-                                  Integer batchMaxQty, BigDecimal setupTimeMin) {
+                                  Integer batchMaxQty, BigDecimal setupTimeMin, Integer lotSize) {
         public static RoutingResponse from(Routing r, ManufacturingProcess p) {
             return new RoutingResponse(r.getSeq(), r.getProcessCode(), p == null ? null : p.getProcessName(),
                     r.getWcCode(), r.getOutputItemCode(), r.getStdTimeMin(), r.getTimeBasis().name(),
-                    r.getBatchMaxQty(), r.getSetupTimeMin());
+                    r.getBatchMaxQty(), r.getSetupTimeMin(), r.getLotSize());
         }
     }
 

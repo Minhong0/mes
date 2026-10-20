@@ -25,8 +25,7 @@ import java.util.List;
 /**
  * 작업지시. 테이블: work_order
  *
- * 상태를 바꾸는 규칙(start, complete, close)을 서비스가 아니라 엔티티 안에 둔다.
- * 그러면 "대기 상태에서만 시작할 수 있다" 같은 규칙이 한곳에만 있고, DB 없이 단위 테스트로 검증할 수 있다.
+ * 상태를 바꾸는 규칙(start, complete, close)은 엔티티 안에 있다.
  */
 @Entity
 @Table(name = "work_order")

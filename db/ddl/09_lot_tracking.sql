@@ -1,4 +1,4 @@
--- LOT 추적 1단계. 이미 만든 DB에도 그대로 실행할 수 있게 없을 때만 추가한다.
+-- LOT 추적. 이미 만든 DB에도 그대로 실행할 수 있게 없을 때만 추가한다.
 USE minimes;
 GO
 SET ANSI_NULLS ON;

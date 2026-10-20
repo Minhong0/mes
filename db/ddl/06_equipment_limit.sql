@@ -5,7 +5,7 @@ SET ANSI_NULLS ON;
 SET QUOTED_IDENTIFIER ON;
 GO
 
--- 관리한계는 기준 기간의 가동(RUN) 데이터로 계산한다: UCL = 평균 + 3 × 표준편차 (슈하트 관리도).
+-- 관리한계는 기준 기간의 가동(RUN) 데이터로 계산한다: UCL = 평균 + 3 × 표준편차.
 -- 계산 결과와 근거(기간, 표본 수)를 함께 남겨, 언제 어떤 데이터로 정한 한계인지 알 수 있게 한다.
 IF OBJECT_ID('equipment_limit', 'U') IS NULL
 CREATE TABLE equipment_limit (

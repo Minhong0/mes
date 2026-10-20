@@ -55,8 +55,12 @@ public sealed record WorkResult(
     bool Cancelled,
     string? CancelReason,
     IReadOnlyList<DefectLine> Defects,
-    string? OutputLotNo,
-    IReadOnlyList<LotInput>? Inputs);
+    IReadOnlyList<string>? OutputLotNos,
+    IReadOnlyList<LotInput>? Inputs)
+{
+    /// <summary>만든 LOT을 한 줄로 (포장처럼 나뉘면 여러 개). 없으면 null</summary>
+    public string? OutputLotText => OutputLotNos is { Count: > 0 } ? string.Join(", ", OutputLotNos) : null;
+}
 
 /// <summary>
 /// 공정에 투입할 품목 하나와 쓸 수 있는 LOT (먼저 들어온 것부터).

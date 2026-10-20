@@ -23,7 +23,6 @@ import java.util.List;
  * 생산 실적 한 건. 테이블: work_result (불량 내역은 defect)
  *
  * 실적은 고치지 않는다. 잘못 입력했으면 취소 표시를 하고 새로 등록한다.
- * 그래야 "누가 언제 무엇을 바꿨는지"가 남는다 (감사 추적).
  */
 @Entity
 @Table(name = "work_result", uniqueConstraints = @UniqueConstraint(name = "uq_work_result_request", columnNames = "request_id"))

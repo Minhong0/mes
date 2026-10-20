@@ -18,10 +18,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-/**
- * 작업지시 생성과 상태 변경.
- * 서비스는 "무엇을 어떤 순서로 할지"(조회 → 검증 → 저장)를 맡고, 상태 규칙 자체는 WorkOrder 엔티티가 맡는다.
- */
+/** 작업지시 생성과 상태 변경. 상태 규칙은 WorkOrder 엔티티가 맡는다. */
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -46,8 +43,7 @@ public class WorkOrderService {
 
     /**
      * 작업지시 번호: WO-yyMMdd-001 (그날의 일련번호).
-     * 한계: 두 사람이 같은 순간에 만들면 같은 번호가 나올 수 있다. 이때는 기본키 중복으로 저장이 실패하므로
-     * 잘못된 데이터가 들어가지는 않는다. 동시 생성이 잦아지면 DB 시퀀스로 바꾼다.
+     * 두 사람이 같은 순간에 만들면 같은 번호가 나올 수 있고, 이때는 기본키 중복으로 저장이 실패한다.
      */
     String nextWoNo(LocalDate today) {
         String prefix = "WO-" + today.format(NO_DATE) + "-";
@@ -70,8 +66,7 @@ public class WorkOrderService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.WORK_ORDER_NOT_FOUND, "작업지시를 찾을 수 없습니다: " + woNo));
     }
 
-    // 아래 메서드들은 save()를 부르지 않는다. 트랜잭션 안에서 조회한 엔티티의 값을 바꾸면
-    // 커밋할 때 JPA가 바뀐 부분을 찾아 UPDATE 한다 (변경 감지, dirty checking).
+    // 아래 메서드들은 save()를 부르지 않는다. 바꾼 값은 커밋할 때 UPDATE 된다 (변경 감지).
 
     public WorkOrder start(String woNo) {
         WorkOrder wo = get(woNo);

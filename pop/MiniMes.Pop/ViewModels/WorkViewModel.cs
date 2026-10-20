@@ -291,7 +291,7 @@ public partial class WorkViewModel : ObservableObject
             PendingReport = null;
             ResetInputs();
             ShowInfo($"{label}을 등록했습니다: 양품 {result.GoodQty}, 불량 {result.DefectQty}"
-                     + (result.OutputLotNo == null ? "" : $" → LOT {result.OutputLotNo}"));
+                     + (result.OutputLotText == null ? "" : $" → LOT {result.OutputLotText}"));
             await RefreshAsync();
         }
         catch (MesConnectionException e)

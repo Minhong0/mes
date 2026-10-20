@@ -2,7 +2,6 @@ namespace MiniMes.Pop.Api;
 
 /// <summary>
 /// POP가 쓰는 서버 API. 화면 로직(ViewModel)은 이 인터페이스만 알고, 실제 HTTP 호출은 MesApiClient가 한다.
-/// 그래서 테스트에서는 서버 없이 가짜 구현으로 화면 로직을 확인할 수 있다.
 ///
 /// 실패는 두 가지로 나눠 던진다.
 /// - MesApiException: 서버가 받아서 거절했다 (입력 오류, 상태 오류). 다시 보내도 결과가 같다.

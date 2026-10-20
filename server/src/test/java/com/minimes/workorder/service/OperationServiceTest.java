@@ -230,8 +230,7 @@ class OperationServiceTest {
         WorkOrder second = workOrderService.create("FG-SFT-100", 30, null, null);
         operationService.start(second.getOperations().getFirst().getWoOpId(), "W1001");   // 두 번째 작업지시를 먼저 시작
         operationService.report(second.getOperations().getFirst().getWoOpId(), report(12));
-        // JPA는 바뀐 값을 커밋(또는 flush) 때 DB에 쓴다. 작업 목록은 MyBatis가 DB에서 직접 읽으므로 먼저 써 둔다.
-        // (실제 API는 요청마다 트랜잭션이 커밋되므로 이 문제가 없다. 한 트랜잭션 안에서 섞어 쓰는 테스트에서만 필요하다)
+        // 작업 목록은 MyBatis가 DB에서 직접 읽으므로, JPA가 아직 쓰지 않은 변경을 먼저 DB에 쓴다.
         entityManager.flush();
 
         List<OperationItem> wc100 = operationService.openOperations("WC-100");

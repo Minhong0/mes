@@ -183,8 +183,7 @@ function metric(label, value, unit) {
     return el('div', null, null, [el('dt', null, label), el('dd', null, value == null ? '-' : `${value} ${unit}`)]);
 }
 
-// 요소 만들기 도우미. 글자는 textContent로 넣는다:
-// innerHTML에 서버 값을 그대로 넣으면 값 안의 <script> 같은 태그가 실행될 수 있다 (XSS).
+// 요소 만들기 도우미. 서버 값이 HTML로 해석되지 않게 글자는 textContent로 넣는다.
 function el(tag, className, text, children) {
     const node = document.createElement(tag);
     if (className) node.className = className;

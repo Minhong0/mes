@@ -1,6 +1,5 @@
 // 정지 사유 파레토: 조건을 바꿀 때마다 /api/monitoring/downtime-pareto를 불러 차트와 표를 다시 그린다.
-// 위 차트 = 누적 비율(%), 아래 차트 = 사유별 정지 시간(분). 단위가 다른 두 값을 오른쪽 보조 축으로 한 그림에 겹치지 않고,
-// x 위치를 맞춘 두 차트로 나눈다 (보조 축은 두 눈금의 맞춤이 임의라 없는 관계를 있는 것처럼 보이게 한다).
+// 위 차트 = 누적 비율(%), 아래 차트 = 사유별 정지 시간(분). 두 차트는 x 위치를 맞춘다.
 
 const API_URL = document.body.dataset.apiUrl;
 const form = document.getElementById('filters');

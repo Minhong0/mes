@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 
 /**
  * 비가동(정지) 기록. 테이블: downtime
- * 부트캠프 과거 실적(BOOTCAMP)과 설비가 보낸 정지(EQUIP)를 같은 테이블에 담아, OEE 계산 쿼리를 하나로 쓴다.
+ * 부트캠프 과거 실적(BOOTCAMP)과 설비가 보낸 정지(EQUIP)를 같은 테이블에 담는다.
  */
 @Entity
 @Table(name = "downtime")
@@ -70,7 +70,6 @@ public class Downtime {
 
     /**
      * 작업자가 POP에서 정지 사유를 확정한다. 정지 중이어도, 끝난 뒤에도 할 수 있다.
-     * 설비가 아는 것은 "멈췄다"와 알람 정도라, 실제 사유(자재 대기, 지그 교체 등)는 현장 작업자가 정한다.
      * 부트캠프 과거 실적은 원본 자료라 고치지 않는다.
      */
     public void confirmReason(String dtCat, String dtSub, String note, String workerId, LocalDateTime now) {

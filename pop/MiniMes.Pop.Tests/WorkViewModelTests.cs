@@ -246,4 +246,17 @@ public class WorkViewModelTests
         Assert.Equal(2, vm.Downtime.Downtimes.Count);
         Assert.Equal("설비 정지 (미확인 1)", vm.Downtime.TabHeader);
     }
+
+    [Fact(DisplayName = "포장처럼 LOT이 나뉘면 만든 LOT 번호를 모두 알려 준다")]
+    public async Task ReportSplitIntoLots()
+    {
+        _api.LotSize = 20;
+        var vm = await OpenAsync();
+        vm.GoodQty = 45;
+
+        await vm.ReportCommand.ExecuteAsync(null);
+
+        Assert.Contains("LOT SF-SFT-010-261017-001, SF-SFT-010-261017-002, SF-SFT-010-261017-003", vm.Message);
+        Assert.Equal(3, vm.Results.Single().OutputLotNos?.Count);
+    }
 }

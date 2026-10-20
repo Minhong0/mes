@@ -6,7 +6,7 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 CREATE TABLE lot (
-    lot_no          VARCHAR(30)   NOT NULL PRIMARY KEY,     -- 예: RM-251001-001, SF030-251003-B01
+    lot_no          VARCHAR(30)   NOT NULL PRIMARY KEY,     -- 품번-yyMMdd-001. 예: SF-SFT-010-261018-001
     item_code       VARCHAR(20)   NOT NULL REFERENCES item (item_code),
     qty             DECIMAL(12,3) NOT NULL CHECK (qty >= 0),   -- 현재 남은 수량
     initial_qty     DECIMAL(12,3) NOT NULL CHECK (initial_qty > 0),

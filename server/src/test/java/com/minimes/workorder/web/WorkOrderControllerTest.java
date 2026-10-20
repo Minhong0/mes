@@ -17,7 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * HTTP 요청부터 응답 JSON까지 확인한다. 서버를 띄우지 않고 MockMvc로 요청을 흉내 낸다.
+ * HTTP 요청부터 응답 JSON까지 확인한다 (MockMvc).
  * 특히 오류 응답이 ErrorResponse 형식(code, message, fieldErrors)으로 나오는지 본다.
  */
 @SpringBootTest

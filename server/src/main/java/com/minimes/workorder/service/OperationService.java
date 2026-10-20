@@ -63,7 +63,7 @@ public class OperationService {
 
     /**
      * 실적 등록. 같은 requestId가 이미 있으면 새로 저장하지 않고 그때 저장한 실적을 돌려준다.
-     * POP가 응답을 받지 못해 다시 보낸 경우다. 오류로 돌려주면 POP는 저장됐는지 알 수 없다.
+     * POP가 응답을 받지 못해 다시 보낸 경우다.
      * 투입 LOT을 줄이고 양품으로 산출 LOT을 만드는 일도 같은 트랜잭션에서 한다. 하나라도 틀리면 실적도 저장되지 않는다.
      */
     public WorkResult report(long woOpId, ReportCommand command) {

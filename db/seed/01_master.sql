@@ -103,14 +103,14 @@ INSERT INTO work_center (wc_code, wc_name, process_code, location, workers, note
     ('WC-700', N'조립/포장 작업장', 'OP-70', N'B동 1층', 2, NULL);
 
 -- routing: 7건
-INSERT INTO routing (item_code, seq, process_code, wc_code, output_item_code, std_time_min, time_basis, batch_max_qty, setup_time_min) VALUES
-    ('FG-SFT-100', '10', 'OP-10', 'WC-100', 'SF-SFT-010', 12, 'EA', NULL, 30),
-    ('FG-SFT-100', '20', 'OP-20', 'WC-200', 'SF-SFT-020', 18, 'EA', NULL, 45),
-    ('FG-SFT-100', '30', 'OP-30', 'WC-300', 'SF-SFT-030', 480, 'BATCH', 200, 0),
-    ('FG-SFT-100', '40', 'OP-40', 'WC-400', 'SF-SFT-040', 8, 'EA', NULL, 0),
-    ('FG-SFT-100', '50', 'OP-50', 'WC-500', 'SF-SFT-040', 20, 'BATCH', 50, 0),
-    ('FG-SFT-100', '60', 'OP-60', 'WC-600', 'SF-SFT-040', 5, 'EA', NULL, 0),
-    ('FG-SFT-100', '70', 'OP-70', 'WC-700', 'FG-SFT-100', 3, 'EA', NULL, 0);
+INSERT INTO routing (item_code, seq, process_code, wc_code, output_item_code, std_time_min, time_basis, batch_max_qty, setup_time_min, lot_size) VALUES
+    ('FG-SFT-100', '10', 'OP-10', 'WC-100', 'SF-SFT-010', 12, 'EA', NULL, 30, NULL),
+    ('FG-SFT-100', '20', 'OP-20', 'WC-200', 'SF-SFT-020', 18, 'EA', NULL, 45, NULL),
+    ('FG-SFT-100', '30', 'OP-30', 'WC-300', 'SF-SFT-030', 480, 'BATCH', 200, 0, NULL),
+    ('FG-SFT-100', '40', 'OP-40', 'WC-400', 'SF-SFT-040', 8, 'EA', NULL, 0, NULL),
+    ('FG-SFT-100', '50', 'OP-50', 'WC-500', 'SF-SFT-040', 20, 'BATCH', 50, 0, NULL),
+    ('FG-SFT-100', '60', 'OP-60', 'WC-600', 'SF-SFT-040', 5, 'EA', NULL, 0, NULL),
+    ('FG-SFT-100', '70', 'OP-70', 'WC-700', 'FG-SFT-100', 3, 'EA', NULL, 0, 20);
 
 -- equipment: 12건
 INSERT INTO equipment (equip_code, equip_name, wc_code, equip_type, maker, model, install_year, ideal_ct_min, planned_min_per_day, auto_collect, note) VALUES

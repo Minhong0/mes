@@ -4,10 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>설비 현황 - Mini-MES</title>
-    <!-- th:href="@{...}": 서버가 앱 경로(context path)를 붙여 준다. 지금은 "/"라서 그대로 /css/... 가 된다 -->
     <link rel="stylesheet" th:href="@{/css/monitoring.css}">
 </head>
-<!-- 주소는 서버가 정해 data-* 속성으로 JS에 넘긴다 (앱 경로가 바뀌어도 JS를 고칠 필요가 없다) -->
+<!-- API 주소는 서버가 정해 data-* 속성으로 JS에 넘긴다 -->
 <body th:data-api-url="@{/api/monitoring/dashboard}" th:data-alarm-url="@{/api/alarms}" th:data-ws-path="@{/ws}">
 <header class="top">
     <div>
@@ -25,7 +24,7 @@
 
 <p class="note">품질(양품률)은 POP에서 등록한 불량으로 계산합니다. 불량을 입력하지 않은 날은 100%입니다.</p>
 
-<!-- STOMP 클라이언트(@stomp/stompjs). CDN이 아니라 서버의 webjar에서 받는다: 공장 내부망은 인터넷이 막힌 경우가 많다 -->
+<!-- STOMP 클라이언트(@stomp/stompjs). 서버의 webjar에서 받는다 -->
 <script th:src="@{/webjars/stomp__stompjs/bundles/stomp.umd.min.js}"></script>
 <script th:src="@{/js/monitoring.js}"></script>
 </body>

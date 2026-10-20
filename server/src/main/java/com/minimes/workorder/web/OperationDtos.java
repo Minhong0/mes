@@ -66,18 +66,18 @@ public final class OperationDtos {
     }
 
     /**
-     * @param outputLotNo 양품으로 만든 LOT (양품이 0개이거나 LOT 추적 전의 실적이면 null)
+     * @param outputLotNos 양품으로 만든 LOT (포장처럼 나누면 여러 개. 양품이 0개이거나 LOT 추적 전의 실적이면 빈 목록)
      * @param inputs      투입한 LOT
      */
     public record ResultResponse(long resultId, long woOpId, String equipCode, String workerId,
                                  LocalDateTime startedAt, LocalDateTime endedAt, int goodQty, int defectQty,
                                  boolean cancelled, String cancelReason, List<DefectResponse> defects,
-                                 String outputLotNo, List<LotInput> inputs) {
+                                 List<String> outputLotNos, List<LotInput> inputs) {
         public static ResultResponse from(WorkResult r, ResultLots lots) {
             return new ResultResponse(r.getResultId(), r.getWoOpId(), r.getEquipCode(), r.getWorkerId(),
                     r.getStartedAt(), r.getEndedAt(), r.getGoodQty(), r.getDefectQty(), r.isCancelled(),
                     r.getCancelReason(), r.getDefects().stream().map(DefectResponse::from).toList(),
-                    lots.outputLotNo(), lots.inputs());
+                    lots.outputLotNos(), lots.inputs());
         }
     }
 

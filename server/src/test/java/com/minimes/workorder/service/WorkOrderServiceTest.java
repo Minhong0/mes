@@ -23,8 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * 서비스 + JPA + H2 테스트.
- * @Transactional: 테스트마다 끝나면 롤백해서 다음 테스트에 데이터가 남지 않는다.
+ * 서비스 + JPA + H2 테스트. 테스트마다 롤백한다.
  * 시각은 2026-10-08 09:00으로 고정해서 작업지시 번호를 예측할 수 있게 한다.
  */
 @SpringBootTest

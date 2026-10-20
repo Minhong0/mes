@@ -15,8 +15,7 @@ public sealed class MessageBuffer : IDisposable
     private readonly SqliteConnection _connection;
 
     // 설비 5대가 동시에 Add를 부르고 보내는 쪽도 동시에 읽는다. 연결 하나를 여러 스레드가 동시에 쓰면 안 되므로 한 번에 하나씩.
-    // 여기 메서드에는 await가 없어서 SemaphoreSlim 대신 더 간단한 lock을 쓴다.
-    private readonly object _lock = new();   // lock에 쓰는 열쇠 객체 (.NET 9부터는 전용 Lock 타입이 있지만 이 프로젝트는 .NET 8)
+    private readonly object _lock = new();
 
     public MessageBuffer(string filePath)
     {
@@ -45,7 +44,7 @@ public sealed class MessageBuffer : IDisposable
         {
             using var command = _connection.CreateCommand();
             command.CommandText = "INSERT INTO outbox (topic, payload, created_at) VALUES ($topic, $payload, $createdAt)";
-            command.Parameters.AddWithValue("$topic", topic);       // 파라미터 바인딩: SQL 인젝션을 막는다 (MyBatis의 #{}와 같은 역할)
+            command.Parameters.AddWithValue("$topic", topic);       // 파라미터 바인딩: SQL 인젝션을 막는다
             command.Parameters.AddWithValue("$payload", payload);
             command.Parameters.AddWithValue("$createdAt", DateTimeOffset.Now.ToString("O"));
             command.ExecuteNonQuery();

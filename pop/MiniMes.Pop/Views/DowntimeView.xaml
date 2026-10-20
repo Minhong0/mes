@@ -110,7 +110,7 @@
                     </TextBlock>
 
                     <TextBlock Text="대분류" FontWeight="Bold" Margin="0,16,0,4" />
-                    <!-- 대분류는 5개뿐이라 콤보 대신 큰 버튼처럼 한눈에 보이게 늘어놓는다 -->
+                    <!-- 대분류는 큰 버튼처럼 늘어놓는다 -->
                     <ListBox ItemsSource="{Binding Categories}" SelectedItem="{Binding SelectedCategory}" BorderThickness="0"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.ItemsPanel>
@@ -119,7 +119,7 @@
                             </ItemsPanelTemplate>
                         </ListBox.ItemsPanel>
                         <ListBox.ItemContainerStyle>
-                            <!-- 고른 대분류는 파란 바탕에 흰 글자. 기본 선택 표시(옅은 회색)는 장갑 낀 손으로 누를 때 잘 안 보인다 -->
+                            <!-- 고른 대분류는 파란 바탕에 흰 글자 -->
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="Margin" Value="0,0,6,6" />
                                 <Setter Property="Cursor" Value="Hand" />

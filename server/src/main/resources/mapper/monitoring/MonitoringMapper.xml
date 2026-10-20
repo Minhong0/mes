@@ -4,9 +4,8 @@
 
     <!--
         설비마다 "가장 최근 한 행"을 세 테이블에서 하나씩 가져온다.
-        OUTER APPLY (SELECT TOP 1 ... ORDER BY ... DESC): 바깥 행(설비)마다 안쪽 쿼리를 한 번씩 실행한다.
-          - LEFT JOIN과 비슷하지만, 안쪽 쿼리가 바깥 행의 값(e.equip_code)을 쓸 수 있고 TOP 1로 한 행만 고를 수 있다.
-          - 결과가 없어도 설비 행은 남는다 (OUTER). 예: 가동 중이면 진행 중인 정지가 없어 d.* 가 NULL.
+        OUTER APPLY (SELECT TOP 1 ... ORDER BY ... DESC): 설비마다 안쪽 쿼리를 한 번씩 실행해 한 행만 고른다.
+        결과가 없어도 설비 행은 남는다. 예: 가동 중이면 진행 중인 정지가 없어 d.* 가 NULL.
         equipment_data는 행이 가장 많은 테이블이지만, 인덱스 (equip_code, collected_at) 덕분에
         설비마다 맨 끝 한 행만 바로 찾아간다.
     -->

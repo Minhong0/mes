@@ -8,10 +8,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.List;
 
-/**
- * 컨트롤러에서 던진 예외를 한곳에서 ErrorResponse로 바꾼다.
- * 컨트롤러마다 try-catch를 쓰지 않아도 되고, 오류 응답 형식이 항상 같아진다.
- */
+/** 컨트롤러에서 던진 예외를 한곳에서 ErrorResponse로 바꾼다. */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
