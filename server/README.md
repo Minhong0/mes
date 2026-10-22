@@ -55,12 +55,20 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
    - 나눌 때 계보는 투입 LOT을 적은 순서대로 꺼내 산출 LOT을 앞에서부터 채웁니다. 불량 몫은 마지막 LOT에 붙어, 투입 LOT마다 이은 수량의 합이 투입 수량과 같습니다.
 3. 실적 취소: 만든 LOT(나눴으면 모두)은 폐기(`SCRAPPED`)하고 투입 수량을 돌려줍니다. 만든 LOT을 이미 다음 공정에 썼으면 409 `LOT_IN_USE` (뒤 공정의 실적부터 취소).
 4. 추적: `GET /api/lots/{lotNo}/trace`가 재귀 CTE로 역방향(이 LOT을 만든 재료, 원자재까지)과 정방향(이 LOT이 들어간 곳)을 함께 돌려줍니다. 취소한 실적의 계보는 뺍니다.
-5. 이력: `GET /api/lots/{lotNo}`에 입고·생산·투입·취소 이력이 일어난 순서대로 나옵니다.
+5. 이력: `GET /api/lots/{lotNo}`에 입고·생산·투입·취소·보류 이력이 일어난 순서대로 나옵니다.
+6. 품질 보류: `POST /api/lots/{lotNo}/hold`, `POST /api/lots/{lotNo}/release` (`{"workerId":"W6001","reason":"외경 치수 불량 의심","includeDownstream":true}`).
+   - 품질 담당(QC)·관리자(ADMIN)만 할 수 있습니다. 작업자는 403 `NOT_ALLOWED`.
+   - `includeDownstream`이면 정방향 추적으로 이 LOT이 들어간 하위 LOT까지 한꺼번에 바꿉니다.
+   - 남은 수량이 있는(`ACTIVE`) LOT만 `HOLD`가 됩니다. 다 쓴·폐기·출하 LOT은 응답의 `skipped`에 상태와 함께 나옵니다. 해제는 `HOLD`인 LOT만 `ACTIVE`로 돌립니다.
+   - 바꾼 LOT마다 `lot_history`에 `HOLD`·`RELEASE`와 사유를 남깁니다. 하위 LOT의 사유에는 원인 LOT 번호가 붙습니다.
+   - 보류한 LOT은 투입 후보에서 빠지고, 투입하면 409 `LOT_ON_HOLD`입니다. 보류 LOT을 만든 실적은 취소할 수 없습니다(먼저 해제). 보류 LOT에 투입 수량을 되돌릴 때는 보류를 유지합니다.
+   - 대상 LOT을 잠근(`UPDLOCK`) 뒤 정방향 추적을 다시 해, 그 사이 다른 실적이 만든 하위 LOT도 빠뜨리지 않습니다.
 
 http://localhost:8080/lots/trace 는 LOT 추적 화면입니다.
 
 - LOT 번호를 넣거나, 품목을 골라 최근 LOT 목록에서 누릅니다. `?lotNo=SF-SFT-030-261019-001`처럼 주소에 LOT을 붙이면 바로 열립니다 (메신저로 링크를 보낼 수 있음).
-- LOT 카드, 회수 범위 숫자(들어간 원자재 LOT, 이 LOT이 들어간 LOT, 그중 아직 쓸 수 있는 LOT), 역방향·정방향 트리, 이력을 보여 줍니다.
+- LOT 카드, 회수 범위 숫자(들어간 원자재 LOT, 이 LOT이 들어간 LOT, 그중 아직 쓸 수 있는 LOT, 보류 중인 LOT), 역방향·정방향 트리, 이력을 보여 줍니다.
+- LOT 카드의 품질 보류 칸에 사번(예: W6001)과 사유를 넣고 [보류]·[보류 해제]를 누릅니다. 하위 LOT 포함은 기본으로 켜져 있습니다. 끝나면 바꾼 LOT 수와 건너뛴 LOT(소진 n개 등)을 보여 주고 다시 추적합니다.
 - 트리의 LOT 번호를 누르면 그 LOT으로 다시 추적하고, 브라우저 [뒤로]로 돌아갑니다.
 - 화면은 모니터링 화면처럼 빈 틀(`templates/lot-trace.html`)이고, `static/js/lot-trace.js`가 두 API를 불러 그립니다.
 
@@ -151,12 +159,12 @@ com.minimes
 │  ├─ mapper      WorkListMapper (작업장의 작업 목록 + 앞 공정 양품) → resources/mapper/workorder/
 │  ├─ service     WorkOrderService, OperationService (시작·실적·완료·취소, requestId 중복 방지)
 │  └─ web         WorkOrderController, OperationController (POP API)
-├─ lot            LOT 입고, 실적의 투입·산출, 취소 되돌리기, 추적
+├─ lot            LOT 입고, 실적의 투입·산출, 취소 되돌리기, 추적, 품질 보류
 │  ├─ domain      Lot(남은 수량, 상태 규칙), LotGenealogy(투입 → 산출), LotHistory(이력), LotStatus, LotEventType
 │  ├─ repository  LotRepository (투입 LOT 잠금 조회 포함)
 │  ├─ mapper      LotTraceMapper (정방향·역방향 재귀 CTE) → resources/mapper/lot/LotTraceMapper.xml
-│  ├─ service     LotService (공정에 투입할 품목, 투입 확인, 기록, 취소)
-│  └─ web         LotController (/api/lots, 공정 투입 LOT), LotPageController (/lots/trace 화면)
+│  ├─ service     LotService (공정에 투입할 품목, 투입 확인, 기록, 취소), LotHoldService (보류·해제)
+│  └─ web         LotController (/api/lots, 보류·해제, 공정 투입 LOT), LotPageController (/lots/trace 화면)
 ├─ production     일별 생산 실적 집계, OEE 조회
 │  ├─ domain      ProductionDaily (production_daily, 복합키)
 │  ├─ repository
@@ -212,6 +220,8 @@ com.minimes
 | GET | `/api/lots?itemCode=RM-SCM-001&status=ACTIVE` | 품목의 LOT 목록 (최근 100개) |
 | GET | `/api/lots/{lotNo}` | LOT과 이력 (공정 이름 포함) |
 | GET | `/api/lots/{lotNo}/trace` | 역방향(`backward`)·정방향(`forward`) 추적 |
+| POST | `/api/lots/{lotNo}/hold` | 품질 보류 (`{"workerId":"W6001","reason":"...","includeDownstream":true}`). QC·ADMIN만 |
+| POST | `/api/lots/{lotNo}/release` | 보류 해제 (요청 형식은 보류와 같음) |
 | GET | `/api/monitoring/dashboard` | 설비 현황 (현재 상태, 정지 사유, 센서값, 오늘 OEE) |
 | GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
 | GET | `/api/oee/monthly?month=2025-10` | 설비별 월별 OEE (시간·수량 합산 후 계산) |

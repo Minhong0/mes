@@ -12,7 +12,7 @@
 <header class="top">
     <div>
         <h1>LOT 추적</h1>
-        <p class="sub">이 LOT을 만든 재료(원자재까지)와 이 LOT이 들어간 곳을 함께 봅니다. LOT 번호를 누르면 그 LOT으로 다시 추적합니다.</p>
+        <p class="sub">이 LOT을 만든 재료(원자재까지)와 이 LOT이 들어간 곳을 함께 봅니다. LOT 번호를 누르면 그 LOT으로 다시 추적합니다. 문제 LOT은 하위 LOT까지 한꺼번에 보류할 수 있습니다.</p>
     </div>
     <p class="refresh"><a th:href="@{/monitoring}">설비 현황</a> · <a th:href="@{/monitoring/pareto}">정지 사유 파레토</a></p>
 </header>
@@ -56,6 +56,21 @@
             <div><dt>만든 때 · 작업자</dt><dd id="lot-created"></dd></div>
             <div><dt>공급사 LOT</dt><dd id="lot-supplier"></dd></div>
         </dl>
+
+        <!-- 품질 보류·해제: 품질 담당(QC)·관리자만. 보류한 LOT은 해제할 때까지 투입할 수 없다 -->
+        <form id="hold" class="hold">
+            <h3 class="hold-title">품질 보류</h3>
+            <div class="hold-fields">
+                <label>사번 <input name="workerId" placeholder="예: W6001" size="8" autocomplete="off" required></label>
+                <label class="hold-reason">사유 <input name="reason" maxlength="150" placeholder="예: 외경 치수 불량 의심" autocomplete="off" required></label>
+                <label class="hold-check"><input type="checkbox" name="includeDownstream" checked> 이 LOT이 들어간 LOT도 함께 <span id="hold-scope"></span></label>
+            </div>
+            <div class="hold-actions">
+                <button type="submit" name="action" value="hold" class="hold-button">보류</button>
+                <button type="submit" name="action" value="release">보류 해제</button>
+            </div>
+            <p id="hold-result" class="hold-result" hidden></p>
+        </form>
     </section>
 
     <!-- 회수 범위를 가늠하는 숫자: 같은 LOT이 두 경로로 나와도 한 번만 센다 -->
@@ -63,6 +78,7 @@
         <div class="tile"><span>들어간 원자재 LOT</span><strong id="count-materials">-</strong></div>
         <div class="tile"><span>이 LOT이 들어간 LOT</span><strong id="count-affected">-</strong></div>
         <div class="tile"><span>그중 아직 쓸 수 있는 LOT</span><strong id="count-active">-</strong></div>
+        <div class="tile"><span>그중 보류 중인 LOT</span><strong id="count-hold">-</strong></div>
     </section>
 
     <div class="trees">

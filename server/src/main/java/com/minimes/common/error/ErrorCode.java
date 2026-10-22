@@ -23,7 +23,9 @@ public enum ErrorCode {
     RESULT_NOT_FOUND(HttpStatus.NOT_FOUND, "실적을 찾을 수 없습니다."),
     DOWNTIME_NOT_FOUND(HttpStatus.NOT_FOUND, "정지 기록을 찾을 수 없습니다."),
     LOT_NOT_FOUND(HttpStatus.NOT_FOUND, "LOT을 찾을 수 없습니다."),
-    LOT_IN_USE(HttpStatus.CONFLICT, "이미 다음 공정에 투입된 LOT입니다.");
+    LOT_IN_USE(HttpStatus.CONFLICT, "이미 다음 공정에 투입된 LOT입니다."),
+    LOT_ON_HOLD(HttpStatus.CONFLICT, "품질 보류 중인 LOT입니다."),
+    NOT_ALLOWED(HttpStatus.FORBIDDEN, "이 작업을 할 권한이 없습니다.");
 
     private final HttpStatus status;
     private final String defaultMessage;

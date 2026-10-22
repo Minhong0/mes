@@ -1,8 +1,12 @@
 package com.minimes.lot.web;
 
 import com.minimes.lot.domain.LotStatus;
+import com.minimes.lot.service.LotHoldService;
+import com.minimes.lot.service.LotHoldService.HoldCommand;
 import com.minimes.lot.service.LotService;
 import com.minimes.lot.service.LotService.ReceiveCommand;
+import com.minimes.lot.web.LotDtos.HoldRequest;
+import com.minimes.lot.web.LotDtos.HoldResponse;
 import com.minimes.lot.web.LotDtos.InputLotsResponse;
 import com.minimes.lot.web.LotDtos.LotDetailResponse;
 import com.minimes.lot.web.LotDtos.LotResponse;
@@ -25,13 +29,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
-@Tag(name = "LOT 추적", description = "원자재 입고, LOT 조회·이력, 정방향·역방향 추적, 공정 투입 LOT")
+@Tag(name = "LOT 추적", description = "원자재 입고, LOT 조회·이력, 정방향·역방향 추적, 품질 보류·해제, 공정 투입 LOT")
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class LotController {
 
     private final LotService lotService;
+    private final LotHoldService holdService;
     private final OperationService operationService;
 
     @Operation(summary = "원자재 입고", description = "LOT 관리 원자재(환봉, 키홈 핀)를 입고해 LOT을 만든다. LOT 번호: 품번-yyMMdd-001")
@@ -48,7 +53,7 @@ public class LotController {
         return lotService.findByItem(itemCode, status).stream().map(LotResponse::from).toList();
     }
 
-    @Operation(summary = "LOT과 이력", description = "입고·생산·투입·취소 이력을 일어난 순서대로")
+    @Operation(summary = "LOT과 이력", description = "입고·생산·투입·취소·보류 이력을 일어난 순서대로")
     @GetMapping("/lots/{lotNo}")
     public LotDetailResponse detail(@PathVariable String lotNo) {
         return LotDetailResponse.from(lotService.detail(lotNo));
@@ -58,6 +63,22 @@ public class LotController {
     @GetMapping("/lots/{lotNo}/trace")
     public TraceResponse trace(@PathVariable String lotNo) {
         return TraceResponse.from(lotService.trace(lotNo));
+    }
+
+    @Operation(summary = "품질 보류", description = "남은 수량이 있는 LOT을 보류해 투입을 막는다. includeDownstream이면 이 LOT이 들어간 하위 LOT도 함께. 품질(QC)·관리자(ADMIN)만")
+    @PostMapping("/lots/{lotNo}/hold")
+    public HoldResponse hold(@PathVariable String lotNo, @Valid @RequestBody HoldRequest req) {
+        return HoldResponse.from(holdService.hold(lotNo, command(req)));
+    }
+
+    @Operation(summary = "보류 해제", description = "보류 중인 LOT을 다시 쓸 수 있게 한다. includeDownstream이면 하위 LOT도 함께. 품질(QC)·관리자(ADMIN)만")
+    @PostMapping("/lots/{lotNo}/release")
+    public HoldResponse release(@PathVariable String lotNo, @Valid @RequestBody HoldRequest req) {
+        return HoldResponse.from(holdService.release(lotNo, command(req)));
+    }
+
+    private static HoldCommand command(HoldRequest req) {
+        return new HoldCommand(req.workerId(), req.reason().trim(), req.includeDownstream());
     }
 
     @Operation(summary = "공정에 투입할 LOT (POP)", description = "투입할 품목마다 쓸 수 있는 LOT, 먼저 들어온 것부터")

@@ -3,6 +3,7 @@ package com.minimes.lot.web;
 import com.minimes.lot.domain.Lot;
 import com.minimes.lot.domain.LotHistory;
 import com.minimes.lot.mapper.TraceNode;
+import com.minimes.lot.service.LotHoldService.HoldResult;
 import com.minimes.lot.service.LotService.InputCandidates;
 import com.minimes.lot.service.LotService.LotDetail;
 import com.minimes.lot.service.LotService.Trace;
@@ -28,6 +29,22 @@ public final class LotDtos {
             @Size(max = 30) String supplierLotNo,
             @NotBlank(message = "작업자는 필수입니다.") String workerId
     ) {
+    }
+
+    /** 보류·해제 요청. includeDownstream: 이 LOT이 들어간 하위 LOT도 함께 (보내지 않으면 이 LOT만) */
+    public record HoldRequest(
+            @NotBlank(message = "작업자는 필수입니다.") String workerId,
+            @NotBlank(message = "사유는 필수입니다.") @Size(max = 150, message = "사유는 150자까지입니다.") String reason,
+            boolean includeDownstream
+    ) {
+    }
+
+    /** changed: 상태를 바꾼 LOT, skipped: 바꾸지 않은 LOT (다 쓴·폐기·출하 LOT, 해제할 때는 보류가 아닌 LOT) */
+    public record HoldResponse(String lotNo, List<LotResponse> changed, List<LotResponse> skipped) {
+        public static HoldResponse from(HoldResult r) {
+            return new HoldResponse(r.lotNo(), r.changed().stream().map(LotResponse::from).toList(),
+                    r.skipped().stream().map(LotResponse::from).toList());
+        }
     }
 
     public record LotResponse(String lotNo, String itemCode, BigDecimal qty, BigDecimal initialQty, String status,

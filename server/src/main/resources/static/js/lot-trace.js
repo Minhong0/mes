@@ -1,9 +1,12 @@
 // LOT 추적: /api/lots/{lotNo}(LOT과 이력)와 /api/lots/{lotNo}/trace(역방향·정방향)를 함께 불러 그린다.
 // 트리의 LOT 번호를 누르면 그 LOT으로 다시 추적하고, 주소(?lotNo=)도 바꿔 브라우저 [뒤로]로 돌아갈 수 있다.
+// LOT 카드의 보류 칸은 /api/lots/{lotNo}/hold·release를 부르고, 끝나면 같은 LOT을 다시 추적해 바뀐 상태를 그린다.
 
 const LOTS_URL = document.body.dataset.lotsUrl;
 const ITEMS_URL = document.body.dataset.itemsUrl;
 const form = document.getElementById('search');
+const holdForm = document.getElementById('hold');
+const WORKER_KEY = 'mes.lotTrace.workerId';
 const $ = id => document.getElementById(id);
 
 const STATUS_NAMES = { ACTIVE: '사용 가능', HOLD: '보류', CONSUMED: '소진', SHIPPED: '출하', SCRAPPED: '폐기' };
@@ -42,13 +45,17 @@ function lotButton(lotNo) {
     return button;
 }
 
-async function getJson(url) {
-    const response = await fetch(url);
+async function getJson(url, options) {
+    const response = await fetch(url, options);
     const body = await response.json().catch(() => null);
     if (!response.ok) {
         throw new Error(body?.message ?? `서버 오류 (HTTP ${response.status})`);   // 404면 "LOT을 찾을 수 없습니다: ..."
     }
     return body;
+}
+
+function postJson(url, data) {
+    return getJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 }
 
 function showError(message) {
@@ -101,6 +108,8 @@ function renderCounts(result) {
         ? '- (원자재)' : `${distinct(result.backward, n => n.itemType === 'RM')}개`;
     $('count-affected').textContent = `${distinct(result.forward)}개`;
     $('count-active').textContent = `${distinct(result.forward, n => n.status === 'ACTIVE')}개`;
+    $('count-hold').textContent = `${distinct(result.forward, n => n.status === 'HOLD')}개`;
+    $('hold-scope').textContent = result.forward.length ? `(${distinct(result.forward)}개)` : '(없음)';
 }
 
 function renderHistory(history) {
@@ -125,6 +134,7 @@ function renderHistory(history) {
 async function trace(lotNo, push) {
     lotNo = lotNo.trim();
     if (!lotNo) return;
+    if (current !== lotNo) showHoldResult('');   // 다른 LOT으로 가면 지난 보류 결과를 지운다
     current = lotNo;
     form.lotNo.value = lotNo;
     const url = `${location.pathname}?lotNo=${encodeURIComponent(lotNo)}`;
@@ -148,6 +158,60 @@ async function trace(lotNo, push) {
         $('result').hidden = true;
     }
 }
+
+// ---- 품질 보류·해제 ----
+
+const SKIP_NAMES = { HOLD: '이미 보류', ACTIVE: '보류 아님', CONSUMED: '소진', SHIPPED: '출하', SCRAPPED: '폐기' };
+
+function showHoldResult(message, isError = false) {
+    const p = $('hold-result');
+    p.textContent = message;
+    p.classList.toggle('error', isError);
+    p.hidden = !message;
+}
+
+// 예: "3개 LOT을 보류했습니다. 바꾸지 않은 LOT: 소진 1개"
+function holdSummary(verb, response) {
+    const skipped = {};
+    response.skipped.forEach(l => { skipped[l.status] = (skipped[l.status] ?? 0) + 1; });
+    const skippedText = Object.entries(skipped).map(([status, n]) => `${SKIP_NAMES[status] ?? status} ${n}개`).join(', ');
+    const head = response.changed.length ? `${response.changed.length}개 LOT을 ${verb}했습니다.` : `${verb}한 LOT이 없습니다.`;
+    return skippedText ? `${head} 바꾸지 않은 LOT: ${skippedText}` : head;
+}
+
+holdForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const release = event.submitter?.value === 'release';
+    const verb = release ? '보류 해제' : '보류';
+    const lotNo = current;
+    const data = {
+        workerId: holdForm.workerId.value.trim(),
+        reason: holdForm.reason.value.trim(),
+        includeDownstream: holdForm.includeDownstream.checked,
+    };
+    if (!data.reason) {
+        showHoldResult('사유를 적어 주세요.', true);
+        return;
+    }
+    const scope = data.includeDownstream ? `${lotNo}과 이 LOT이 들어간 LOT` : lotNo;
+    if (!confirm(`${scope}을 ${verb}합니다.\n사유: ${data.reason}`)) return;
+
+    try { localStorage.setItem(WORKER_KEY, data.workerId); } catch { /* 저장하지 못해도 다음에 다시 적으면 된다 */ }
+    const buttons = holdForm.querySelectorAll('button');
+    buttons.forEach(b => { b.disabled = true; });
+    try {
+        const response = await postJson(`${LOTS_URL}/${encodeURIComponent(lotNo)}/${release ? 'release' : 'hold'}`, data);
+        holdForm.reason.value = '';
+        showHoldResult(holdSummary(verb, response));
+        await trace(lotNo, false);
+    } catch (e) {
+        showHoldResult(e.message, true);   // 403이면 "LOT 보류·해제는 품질 담당이나 관리자만 할 수 있습니다"
+    } finally {
+        buttons.forEach(b => { b.disabled = false; });
+    }
+});
+
+try { holdForm.workerId.value = localStorage.getItem(WORKER_KEY) ?? ''; } catch { /* 저장소를 쓸 수 없는 브라우저 */ }
 
 // ---- 품목별 최근 LOT ----
 

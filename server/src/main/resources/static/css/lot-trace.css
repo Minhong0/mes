@@ -87,3 +87,27 @@
 .recent-lot { color: var(--accent); cursor: pointer; font-weight: 600; }
 #recent-rows tr:hover td { background: var(--bg); }
 .panel:has(#history-rows) { overflow-x: auto; }
+
+/* 품질 보류 칸: LOT 카드 아래. 보류 버튼만 빨갛게 해서 해제와 헷갈리지 않게 한다 */
+.hold { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.hold-title { margin: 0 0 8px; font-size: 14px; }
+.hold-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.hold-reason { flex: 1 1 260px; display: flex; align-items: center; gap: 6px; }
+.hold-reason input { flex: 1; min-width: 0; }
+.hold-check { display: flex; align-items: center; gap: 6px; }
+.hold-check span { color: var(--muted); }
+.hold input:not([type="checkbox"]), .hold button {
+    font: inherit;
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--text);
+}
+.hold-actions { display: flex; gap: 8px; margin-top: 10px; }
+.hold button { cursor: pointer; }
+.hold button:hover { border-color: var(--accent); }
+.hold button:disabled { cursor: wait; opacity: .6; }
+.hold .hold-button { border-color: var(--down); background: var(--down); color: #fff; font-weight: 600; }
+.hold-result { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--bg); }
+.hold-result.error { background: #fdecec; color: var(--down); }

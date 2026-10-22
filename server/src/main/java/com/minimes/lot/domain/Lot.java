@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
  *
  * 원자재 LOT은 입고할 때, 반제품·완제품 LOT은 실적을 등록할 때 양품 수량으로 만든다.
  * 다음 공정에 투입하면 남은 수량(qty)이 줄고, 0이 되면 CONSUMED가 된다.
+ * 품질 문제로 보류(HOLD)하면 해제할 때까지 투입할 수 없다.
  */
 @Entity
 @Table(name = "lot")
@@ -86,6 +87,9 @@ public class Lot {
 
     /** 다음 공정에 투입. 남은 수량보다 많이 쓸 수 없다. */
     public void consume(BigDecimal used) {
+        if (status == LotStatus.HOLD) {
+            throw onHold(lotNo);
+        }
         if (status != LotStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION,
                     "%s 상태의 LOT은 투입할 수 없습니다: %s".formatted(status, lotNo));
@@ -100,23 +104,56 @@ public class Lot {
         }
     }
 
-    /** 실적 취소: 투입했던 수량을 돌려받는다. */
+    /** 실적 취소: 투입했던 수량을 돌려받는다. 보류 중인 LOT은 수량만 돌려받고 보류는 그대로 둔다. */
     public void restore(BigDecimal used) {
-        if (status != LotStatus.ACTIVE && status != LotStatus.CONSUMED) {
+        if (status != LotStatus.ACTIVE && status != LotStatus.CONSUMED && status != LotStatus.HOLD) {
             throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION,
                     "%s 상태의 LOT에는 수량을 되돌릴 수 없습니다: %s".formatted(status, lotNo));
         }
         qty = qty.add(used);
-        status = LotStatus.ACTIVE;
+        if (status == LotStatus.CONSUMED) {
+            status = LotStatus.ACTIVE;
+        }
     }
 
     /** 실적 취소: 그 실적으로 만든 LOT을 없앤다. 이미 다음 공정에 쓰기 시작했으면 먼저 그 실적을 취소해야 한다. */
     public void cancelProduced() {
+        if (status == LotStatus.HOLD) {
+            throw new BusinessException(ErrorCode.LOT_ON_HOLD,
+                    "LOT %s가 품질 보류 중이라 이 실적을 취소할 수 없습니다. 보류를 먼저 해제하세요.".formatted(lotNo));
+        }
         if (status != LotStatus.ACTIVE || qty.compareTo(initialQty) != 0) {
             throw new BusinessException(ErrorCode.LOT_IN_USE,
                     "LOT %s가 이미 다음 공정에 투입되었습니다. 다음 공정의 실적을 먼저 취소하세요.".formatted(lotNo));
         }
         qty = BigDecimal.ZERO;
         status = LotStatus.SCRAPPED;
+    }
+
+    /** 남은 수량이 있는 LOT만 보류할 수 있다. 다 쓴(CONSUMED) LOT은 막을 것이 없다. */
+    public boolean canHold() {
+        return status == LotStatus.ACTIVE;
+    }
+
+    /** 품질 보류: 해제할 때까지 투입할 수 없다. */
+    public void hold() {
+        if (!canHold()) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION,
+                    "%s 상태의 LOT은 보류할 수 없습니다: %s".formatted(status, lotNo));
+        }
+        status = LotStatus.HOLD;
+    }
+
+    public void release() {
+        if (status != LotStatus.HOLD) {
+            throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION,
+                    "보류 중인 LOT이 아닙니다: %s (%s)".formatted(lotNo, status));
+        }
+        status = LotStatus.ACTIVE;
+    }
+
+    /** 보류 LOT을 투입하려 할 때의 오류. 투입 확인(LotService.planInputs)도 같은 메시지를 쓴다. */
+    public static BusinessException onHold(String lotNo) {
+        return new BusinessException(ErrorCode.LOT_ON_HOLD, "품질 보류 중인 LOT은 투입할 수 없습니다: " + lotNo);
     }
 }

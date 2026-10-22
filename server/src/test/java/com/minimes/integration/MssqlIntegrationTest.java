@@ -486,6 +486,57 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.history[*].eventType").value(contains("RECEIVE", "CONSUME", "CONSUME", "CANCEL")));
     }
 
+    @Test
+    @DisplayName("LOT 보류 (정방향 재귀 CTE + UPDLOCK): 환봉을 하위까지 보류 → 투입 후보에서 빠지고 투입은 409, 작업자는 403, 해제하면 다시 쓴다")
+    void lotHold() throws Exception {
+        String bar = receiveBar(10);
+        String created = mockMvc.perform(post("/api/work-orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemCode\":\"FG-SFT-100\",\"planQty\":10}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        int op10 = JsonPath.read(created, "$.operations[0].woOpId");
+        int op20 = JsonPath.read(created, "$.operations[1].woOpId");
+        startOperation(op10);
+        String turned = reportLot(op10, 5, 0, bar, 5);
+        startOperation(op20);
+        String milled = reportLot(op20, 3, 0, turned, 3);
+
+        String hold = "{\"workerId\":\"%s\",\"reason\":\"치수 불량 의심\",\"includeDownstream\":true}";
+        mockMvc.perform(post("/api/lots/{lotNo}/hold", bar).contentType(MediaType.APPLICATION_JSON)
+                        .content(hold.formatted("W1001")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("NOT_ALLOWED"));
+        mockMvc.perform(post("/api/lots/{lotNo}/hold", bar).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W6001\",\"reason\":\" \"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/lots/{lotNo}/hold", bar).contentType(MediaType.APPLICATION_JSON)
+                        .content(hold.formatted("W6001")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changed[*].lotNo").value(contains(bar, turned, milled)))
+                .andExpect(jsonPath("$.changed[1].status").value("HOLD"))
+                .andExpect(jsonPath("$.skipped.length()").value(0));
+
+        mockMvc.perform(get("/api/operations/{id}/input-lots", op20))
+                .andExpect(jsonPath("$[0].lots.length()").value(0));
+        mockMvc.perform(post("/api/operations/{id}/results", op20).contentType(MediaType.APPLICATION_JSON)
+                        .content(reportJson(2, 0, turned, 2)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("LOT_ON_HOLD"));
+        mockMvc.perform(get("/api/lots/{lotNo}/trace", bar))
+                .andExpect(jsonPath("$.forward[*].status").value(contains("HOLD", "HOLD")));
+
+        mockMvc.perform(post("/api/lots/{lotNo}/release", bar).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W9001\",\"reason\":\"재검사 합격\",\"includeDownstream\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.changed.length()").value(3));
+        reportLot(op20, 2, 0, turned, 2);
+        mockMvc.perform(get("/api/lots/{lotNo}", turned))
+                .andExpect(jsonPath("$.lot.status").value("CONSUMED"))
+                .andExpect(jsonPath("$.history[*].eventType").value(contains("PRODUCE", "CONSUME", "HOLD", "RELEASE", "CONSUME")))
+                .andExpect(jsonPath("$.history[2].note").value("치수 불량 의심 (원인 LOT " + bar + ")"));
+    }
+
     private String receiveBar(int qty) throws Exception {
         String body = mockMvc.perform(post("/api/lots/receive").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"itemCode\":\"RM-SCM-001\",\"qty\":" + qty + ",\"supplierLotNo\":\"SUP-IT\",\"workerId\":\"W1001\"}"))

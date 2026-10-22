@@ -13,3 +13,7 @@ INSERT INTO bom (parent_item_code, child_item_code, qty, unit, process_code) VAL
     ('SF-SFT-010', 'RM-OIL-001', 0.025, 'L', 'OP-10'),
     ('SF-SFT-020', 'SF-SFT-010', 1, 'EA', 'OP-20'),
     ('SF-SFT-030', 'SF-SFT-020', 1, 'EA', 'OP-30');
+
+-- 품질 보류·해제는 품질 담당(QC)·관리자만 한다
+INSERT INTO worker (worker_id, worker_name, wc_code, role, use_yn) VALUES
+    ('W6001', '강예린', NULL, 'QC', 'Y');

@@ -161,6 +161,9 @@ public class LotService {
                         ? "LOT %s는 입고한 원자재 LOT이 아닙니다.".formatted(lot.getLotNo())
                         : "LOT %s는 이 작업지시의 %s 공정에서 만든 LOT이 아닙니다.".formatted(lot.getLotNo(), need.fromProcess()));
             }
+            if (lot.getStatus() == LotStatus.HOLD) {
+                throw Lot.onHold(lot.getLotNo());
+            }
             if (lot.getStatus() != LotStatus.ACTIVE) {
                 throw new BusinessException(ErrorCode.INVALID_STATUS_TRANSITION,
                         "%s 상태의 LOT은 투입할 수 없습니다: %s".formatted(lot.getStatus(), lot.getLotNo()));
