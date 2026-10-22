@@ -259,4 +259,27 @@ public class WorkViewModelTests
         Assert.Contains("LOT SF-SFT-010-261017-001, SF-SFT-010-261017-002, SF-SFT-010-261017-003", vm.Message);
         Assert.Equal(3, vm.Results.Single().OutputLotNos?.Count);
     }
+
+    [Fact(DisplayName = "화면을 띄운 뒤 보류된 LOT으로 등록하면, 거절 이유를 보여 주고 투입 LOT을 다시 읽어 보류 LOT을 뺀다")]
+    public async Task HeldLotReloadsInputs()
+    {
+        _api.Inputs = [FakeMesApi.BarStock()];
+        var vm = await OpenAsync();
+        vm.GoodQty = 2;   // 먼저 들어온 001(3개 남음)이 골라진다
+
+        _api.HeldLots.Add("RM-SCM-001-261017-001");   // 품질 담당이 보류: 서버는 후보에서 빼고 투입을 거절한다
+        _api.Inputs = [FakeMesApi.BarStock() with { Lots = [FakeMesApi.BarStock().Lots[1]] }];
+        await vm.ReportCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsError);
+        Assert.Contains("품질 보류 중인 LOT은 투입할 수 없습니다: RM-SCM-001-261017-001", vm.Message);
+        Assert.False(vm.HasPendingReport);
+        Assert.Empty(_api.Saved);
+        Assert.Equal(["RM-SCM-001-261017-002"], vm.InputGroups.Single().Lots.Select(l => l.LotNo));
+
+        await vm.ReportCommand.ExecuteAsync(null);   // 다시 고른 002로 등록
+
+        Assert.Single(_api.Saved);
+        Assert.Equal("RM-SCM-001-261017-002", _api.Sent.Last().Inputs.Single().LotNo);
+    }
 }

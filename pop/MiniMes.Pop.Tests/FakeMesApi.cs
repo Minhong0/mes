@@ -68,6 +68,9 @@ public sealed class FakeMesApi : IMesApi
         new LotStock("RM-SCM-001-261017-002", 10, new DateTime(2026, 10, 17, 8, 30, 0)),
     ]);
 
+    /// <summary>품질 보류한 LOT. 이 LOT을 투입한 실적은 서버처럼 거절한다 (투입 후보에서 빼는 것은 Inputs로 정한다)</summary>
+    public HashSet<string> HeldLots { get; } = [];
+
     public Task<IReadOnlyList<InputLots>> GetInputLotsAsync(long woOpId) => Task.FromResult<IReadOnlyList<InputLots>>(Inputs.ToList());
 
     public Task<WorkResult> ReportAsync(long woOpId, ReportRequest request)
@@ -81,6 +84,12 @@ public sealed class FakeMesApi : IMesApi
                 SaveOnce(request);   // 서버는 저장했는데 응답이 돌아오지 못한 경우
             }
             return Task.FromException<WorkResult>(new MesConnectionException("서버 응답이 없습니다.", new TimeoutException()));
+        }
+        var held = request.Inputs.FirstOrDefault(i => HeldLots.Contains(i.LotNo));
+        if (held != null)
+        {
+            return Task.FromException<WorkResult>(
+                new MesApiException(409, "LOT_ON_HOLD", $"품질 보류 중인 LOT은 투입할 수 없습니다: {held.LotNo}"));
         }
         if (request.GoodQty > Operation.PlanQty)
         {

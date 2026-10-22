@@ -303,6 +303,13 @@ public partial class WorkViewModel : ObservableObject
         {
             _pendingStore.Clear(Worker.WorkerId);
             PendingReport = null;      // 서버가 거절했다: 저장되지 않은 것이 확실하다
+            if (e.Code == "LOT_ON_HOLD")
+            {
+                // 화면에 띄운 뒤 품질 보류된 LOT이다. 투입 LOT을 다시 읽으면 보류 LOT이 빠진다
+                await LoadResultsAsync();
+                ShowError(PendingLabel(label, e.Message) + " 투입 LOT을 다시 읽었습니다. 확인하고 다시 등록하세요.");
+                return;
+            }
             ShowError(PendingLabel(label, e.Message));
         }
         finally
