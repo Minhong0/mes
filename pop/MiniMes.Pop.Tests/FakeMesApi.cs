@@ -143,6 +143,58 @@ public sealed class FakeMesApi : IMesApi
     public Task<WorkResult> CancelResultAsync(long resultId, string workerId, string reason) =>
         throw new NotSupportedException();
 
+    /// <summary>선삭 검사 항목: 외경 37.95~38.05 mm, 표면 거칠기 3.2 um 이하</summary>
+    public static IReadOnlyList<InspectionItem> TurningSpecs() =>
+    [
+        new("OD", "외경", "mm", 38m, 37.95m, 38.05m, null, []),
+        new("RA", "표면 거칠기", "um", null, null, 3.2m, null, []),
+    ];
+
+    /// <summary>LOT별 검사표. 없는 LOT은 선삭 항목으로 아직 검사 전인 검사표를 준다</summary>
+    public Dictionary<string, InspectionSheet> Sheets { get; } = [];
+
+    public List<(string LotNo, InspectRequest Request)> Inspections { get; } = [];
+
+    /// <summary>다음 검사 등록 몇 번을 "서버 응답 없음"으로 실패시킨다.</summary>
+    public int FailInspects { get; set; }
+
+    public Task<InspectionSheet> GetInspectionAsync(string lotNo) => Task.FromResult(SheetOf(lotNo));
+
+    private InspectionSheet SheetOf(string lotNo) => Sheets.GetValueOrDefault(lotNo)
+        ?? new InspectionSheet(lotNo, "SF-SFT-010", "ACTIVE", "OP-10", "CNC 선삭", null, 0, null, null, TurningSpecs(), []);
+
+    /// <summary>서버처럼 하한·상한으로 판정하고, 하나라도 NG면 LOT을 보류한 검사표를 돌려준다</summary>
+    public Task<InspectionSheet> InspectAsync(string lotNo, InspectRequest request)
+    {
+        Inspections.Add((lotNo, request));
+        if (FailInspects > 0)
+        {
+            FailInspects--;
+            return Task.FromException<InspectionSheet>(new MesConnectionException("서버 응답이 없습니다.", new TimeoutException()));
+        }
+        var sheet = SheetOf(lotNo);
+        var items = sheet.Items.Select(item => item with
+        {
+            Samples = request.Measurements.Where(m => m.InspectCode == item.InspectCode)
+                .Select(m => new InspectionSample(m.SampleNo, m.Value,
+                    (item.Lsl == null || m.Value >= item.Lsl) && (item.Usl == null || m.Value <= item.Usl) ? "OK" : "NG"))
+                .ToList(),
+        }).ToList();
+        var ng = items.Any(i => i.Samples.Any(s => s.Judgement == "NG"));
+        var saved = sheet with
+        {
+            Status = ng ? "HOLD" : sheet.Status,
+            Judgement = ng ? "NG" : "OK",
+            SampleCount = request.Measurements.Max(m => m.SampleNo),
+            WorkerId = request.WorkerId,
+            MeasuredAt = new DateTime(2026, 10, 22, 14, 5, 0),
+            Items = items,
+            HeldLotNos = ng ? [lotNo] : [],
+        };
+        Sheets[lotNo] = saved with { HeldLotNos = [] };
+        return Task.FromResult(saved);
+    }
+
     public List<Downtime> Downtimes { get; } =
     [
         new(2, "CNC01", new DateTime(2026, 10, 17, 10, 0, 0), null, null, "BREAKDOWN", "BRK_SPINDLE", null, null, null),

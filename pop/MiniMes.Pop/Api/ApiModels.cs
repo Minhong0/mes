@@ -86,5 +86,40 @@ public sealed record Downtime(
 /// <summary>정지 사유 확정 요청. DtSub, Note는 비워도 된다</summary>
 public sealed record ReasonRequest(string WorkerId, string DtCat, string? DtSub, string? Note);
 
+/// <summary>
+/// LOT 검사표: 그 LOT을 만든 공정의 검사 항목과, 검사했으면 시료별 측정값.
+/// Judgement: 검사 전이면 null, 하나라도 NG면 "NG". HeldLotNos: 이번 검사가 불합격이라 보류한 LOT (이 LOT과 하위 LOT)
+/// </summary>
+public sealed record InspectionSheet(
+    string LotNo,
+    string ItemCode,
+    string Status,
+    string? ProcessCode,
+    string? ProcessName,
+    string? Judgement,
+    int SampleCount,
+    string? WorkerId,
+    DateTime? MeasuredAt,
+    IReadOnlyList<InspectionItem> Items,
+    IReadOnlyList<string> HeldLotNos);
+
+/// <summary>검사 항목 하나. Lsl·Usl 중 하나는 없을 수 있다 (예: 표면 거칠기는 상한만)</summary>
+public sealed record InspectionItem(
+    string InspectCode,
+    string InspectName,
+    string Unit,
+    decimal? Nominal,
+    decimal? Lsl,
+    decimal? Usl,
+    string? EquipCode,
+    IReadOnlyList<InspectionSample> Samples);
+
+public sealed record InspectionSample(int SampleNo, decimal Value, string Judgement);
+
+/// <summary>검사 등록 요청. 모든 항목을 시료 1번부터 n번까지</summary>
+public sealed record InspectRequest(string WorkerId, IReadOnlyList<Measurement> Measurements);
+
+public sealed record Measurement(string InspectCode, int SampleNo, decimal Value);
+
 /// <summary>서버 오류 응답 (common.error.ErrorResponse)</summary>
 public sealed record ApiError(string Code, string Message);

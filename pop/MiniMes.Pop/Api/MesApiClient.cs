@@ -47,6 +47,12 @@ public sealed class MesApiClient : IMesApi
     public Task<WorkResult> CancelResultAsync(long resultId, string workerId, string reason) =>
         PostAsync<WorkResult>($"api/results/{resultId}/cancel", new { workerId, reason });
 
+    public Task<InspectionSheet> GetInspectionAsync(string lotNo) =>
+        GetAsync<InspectionSheet>($"api/lots/{Uri.EscapeDataString(lotNo)}/inspection");
+
+    public Task<InspectionSheet> InspectAsync(string lotNo, InspectRequest request) =>
+        PostAsync<InspectionSheet>($"api/lots/{Uri.EscapeDataString(lotNo)}/inspection", request);
+
     public Task<IReadOnlyList<Downtime>> GetDowntimesAsync(string equipCode, int limit) =>
         GetAsync<IReadOnlyList<Downtime>>($"api/equipment/{Uri.EscapeDataString(equipCode)}/downtimes?limit={limit}");
 

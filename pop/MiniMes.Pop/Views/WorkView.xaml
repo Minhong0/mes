@@ -59,7 +59,7 @@
             </StackPanel>
         </DockPanel>
 
-        <!-- 본문: [작업] 탭과 [설비 정지] 탭. 보내지 못한 실적이 있어도 정지 사유는 입력할 수 있다 -->
+        <!-- 본문: [작업], [설비 정지], [검사] 탭. 보내지 못한 실적이 있어도 정지 사유와 검사는 입력할 수 있다 -->
         <TabControl Grid.Row="1" Margin="8,8,8,0" Background="Transparent" BorderThickness="0" Padding="0">
             <TabControl.Resources>
                 <Style TargetType="TabItem">
@@ -343,6 +343,9 @@
             </TabItem>
             <TabItem Header="{Binding Downtime.TabHeader}" AutomationProperties.Name="설비 정지">
                 <views:DowntimeView DataContext="{Binding Downtime}" Margin="-8,0" />
+            </TabItem>
+            <TabItem Header="검사">
+                <views:InspectionView DataContext="{Binding Inspection}" Margin="-8,0" />
             </TabItem>
         </TabControl>
 

@@ -38,23 +38,17 @@ public partial class WorkViewModel : ObservableObject
         _pendingStore = pendingStore;
         _logout = logout;
         Worker = worker;
-        Downtime = new DowntimeViewModel(api, worker, (message, isError) =>
-        {
-            if (isError)
-            {
-                ShowError(message);
-            }
-            else
-            {
-                ShowInfo(message);
-            }
-        });
+        Downtime = new DowntimeViewModel(api, worker, ShowMessage);
+        Inspection = new InspectionViewModel(api, worker, ShowMessage);
     }
 
     public Worker Worker { get; }
 
     /// <summary>설비 정지 탭</summary>
     public DowntimeViewModel Downtime { get; }
+
+    /// <summary>검사 탭: 고른 공정에서 만든 LOT을 검사한다</summary>
+    public InspectionViewModel Inspection { get; }
 
     public ObservableCollection<string> WorkCenters { get; } = [];
 
@@ -401,6 +395,7 @@ public partial class WorkViewModel : ObservableObject
         {
             Results.Clear();
             SetInputGroups([]);
+            Inspection.ShowResults([]);
             return;
         }
         try
@@ -417,6 +412,7 @@ public partial class WorkViewModel : ObservableObject
                 Results.Add(r);
             }
             SetInputGroups(inputs);
+            Inspection.ShowResults(results);
         }
         catch (Exception e) when (e is MesApiException or MesConnectionException)
         {
@@ -497,5 +493,18 @@ public partial class WorkViewModel : ObservableObject
     {
         IsError = true;
         Message = message;
+    }
+
+    /// <summary>다른 탭(설비 정지, 검사)이 아래 메시지 줄에 띄울 때</summary>
+    private void ShowMessage(string message, bool isError)
+    {
+        if (isError)
+        {
+            ShowError(message);
+        }
+        else
+        {
+            ShowInfo(message);
+        }
     }
 }

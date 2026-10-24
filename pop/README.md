@@ -19,9 +19,13 @@ C# .NET 8, WPF, MVVM(CommunityToolkit.Mvvm). 작업자가 작업장의 작업을
   ├─ [작업] 탭
   │    고른 작업: [작업 시작] → 양품·불량 입력 → 투입 LOT 확인 → [실적 등록] (여러 번) → [공정 완료]
   │    등록한 실적은 [취소]할 수 있다 (사유 입력, 취소 표시만 하고 지우지 않음)
-  └─ [설비 정지] 탭 (머리에 미확인 정지 수)
-       고른 설비의 최근 정지 10건 → 정지를 고르고 대분류·소분류·메모 → [사유 저장]
+  ├─ [설비 정지] 탭 (머리에 미확인 정지 수)
+  │    고른 설비의 최근 정지 10건 → 정지를 고르고 대분류·소분류·메모 → [사유 저장]
+  └─ [검사] 탭
+       고른 작업이 만든 LOT → 시료 수(기본 3, 최대 10) → 항목 × 시료 칸에 측정값 → [검사 등록]
 ```
+
+검사: 칸에 값을 넣으면 기준 안이면 초록, 밖이면 빨강으로 바로 보입니다(최종 판정은 서버). 모든 칸을 채워야 등록할 수 있습니다. 하나라도 기준을 벗어나면 서버가 그 LOT과 하위 LOT을 보류하고, 아래 메시지 줄에 보류한 LOT을 알려 줍니다. 이미 검사한 LOT을 고르면 측정값과 판정을 읽기 전용으로 보여 줍니다.
 
 투입 LOT: 수량(양품 + 불량)을 넣으면 먼저 들어온 LOT부터 필요한 만큼 자동으로 체크됩니다. 다른 LOT을 썼으면 체크를 바꿉니다. 모자라면 부족 수량이 빨갛게 보이고 등록할 수 없습니다. 등록하면 양품으로 만든 LOT 번호가 나옵니다. 조립·포장처럼 20개씩 나뉘는 공정은 LOT 번호가 여러 개 나옵니다. 품질 보류한 LOT은 목록에 나오지 않습니다. 화면을 띄운 뒤 보류된 LOT으로 등록하면 서버가 거절하고(`LOT_ON_HOLD`), POP가 투입 LOT을 다시 읽어 보류 LOT을 뺍니다.
 
@@ -36,14 +40,15 @@ C# .NET 8, WPF, MVVM(CommunityToolkit.Mvvm). 작업자가 작업장의 작업을
 - 서버가 입력 오류로 거절한 경우(400 등)는 저장되지 않은 것이 확실하므로 잡아 두지 않습니다.
 - 실적 요청은 **보내기 전에** 단말 파일 `%LOCALAPPDATA%\MiniMes.Pop\pending\{사번}.json`에 적고, 결과가 확실해지면(저장됨, 거절됨) 지웁니다. 응답을 기다리다 POP가 꺼져도 다음에 로그인하면 그 요청을 같은 요청 ID로 자동으로 다시 보냅니다.
 - 정지 사유 저장은 같은 내용을 다시 보내도 결과가 같아서(PUT), 응답이 없으면 [사유 저장]을 다시 누르면 됩니다.
+- 검사 등록도 같은 값을 다시 보내면 서버가 처음 결과를 돌려주므로, 응답이 없으면 [검사 등록]을 다시 누르면 됩니다.
 
 ## 구조
 
 | 폴더 | 내용 |
 | --- | --- |
 | `Api/` | `IMesApi`(화면이 쓰는 서버 기능), `MesApiClient`(HttpClient 구현), 요청·응답 record |
-| `ViewModels/` | `MainViewModel`(화면 전환), `LoginViewModel`, `WorkViewModel`, `DowntimeViewModel`(설비 정지 탭), `InputLotGroup`(투입 LOT), `DefectEntry`, `IDialogService` |
-| `Views/` | `LoginView`, `WorkView`, `DowntimeView`, 입력 창, `WpfDialogService` |
+| `ViewModels/` | `MainViewModel`(화면 전환), `LoginViewModel`, `WorkViewModel`, `DowntimeViewModel`(설비 정지 탭), `InspectionViewModel`(검사 탭, `InspectionRow`·`SampleCell`), `InputLotGroup`(투입 LOT), `DefectEntry`, `IDialogService` |
+| `Views/` | `LoginView`, `WorkView`, `DowntimeView`, `InspectionView`, 입력 창, `WpfDialogService` |
 | `Storage/` | `IPendingReportStore`, `FilePendingReportStore` (보내지 못한 실적을 단말 파일에 보관) |
 
 ## 테스트

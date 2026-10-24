@@ -30,6 +30,12 @@ public interface IMesApi
 
     Task<WorkResult> CancelResultAsync(long resultId, string workerId, string reason);
 
+    /// <summary>LOT을 만든 공정의 검사표 (검사했으면 결과 포함)</summary>
+    Task<InspectionSheet> GetInspectionAsync(string lotNo);
+
+    /// <summary>검사 등록. 하나라도 NG면 서버가 LOT을 보류한다. 같은 값을 다시 보내면 처음 결과가 온다</summary>
+    Task<InspectionSheet> InspectAsync(string lotNo, InspectRequest request);
+
     /// <summary>설비의 최근 정지 (최근 것부터)</summary>
     Task<IReadOnlyList<Downtime>> GetDowntimesAsync(string equipCode, int limit);
 
