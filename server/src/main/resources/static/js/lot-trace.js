@@ -1,4 +1,4 @@
-// LOT 추적: /api/lots/{lotNo}(LOT과 이력)와 /api/lots/{lotNo}/trace(역방향·정방향)를 함께 불러 그린다.
+// LOT 추적: /api/lots/{lotNo}(LOT과 이력), /trace(역방향·정방향), /inspection(검사)을 함께 불러 그린다.
 // 트리의 LOT 번호를 누르면 그 LOT으로 다시 추적하고, 주소(?lotNo=)도 바꿔 브라우저 [뒤로]로 돌아갈 수 있다.
 // LOT 카드의 보류 칸은 /api/lots/{lotNo}/hold·release를 부르고, 끝나면 같은 LOT을 다시 추적해 바뀐 상태를 그린다.
 
@@ -142,12 +142,13 @@ async function trace(lotNo, push) {
 
     const base = `${LOTS_URL}/${encodeURIComponent(lotNo)}`;
     try {
-        const [detail, result] = await Promise.all([getJson(base), getJson(`${base}/trace`)]);
+        const [detail, result, sheet] = await Promise.all([getJson(base), getJson(`${base}/trace`), getJson(`${base}/inspection`)]);
         if (current !== lotNo) return;   // 그 사이에 다른 LOT을 눌렀다
         renderLot(detail);
         renderCounts(result);
         renderTree('backward', result.backward);
         renderTree('forward', result.forward);
+        renderInspection(sheet);
         renderHistory(detail.history);
         showError('');
         $('result').hidden = false;
@@ -156,6 +157,42 @@ async function trace(lotNo, push) {
         if (current !== lotNo) return;
         showError(e.message);
         $('result').hidden = true;
+    }
+}
+
+// ---- 검사 ----
+
+// 예: "37.95 ~ 38.05 mm", 상한만 있으면 "≤ 3.2 um"
+function specRange(item) {
+    const unit = item.unit ? ` ${item.unit}` : '';
+    if (item.lsl != null && item.usl != null) return `${qty(item.lsl)} ~ ${qty(item.usl)}${unit}`;
+    return item.usl != null ? `≤ ${qty(item.usl)}${unit}` : `≥ ${qty(item.lsl)}${unit}`;
+}
+
+function judgementBadge(judgement) {
+    return el('span', `judge ${judgement}`, judgement === 'OK' ? '합격' : '불합격');
+}
+
+function renderInspection(sheet) {
+    $('inspection').hidden = sheet.items.length === 0;
+    if (sheet.items.length === 0) return;
+    const samples = Array.from({ length: sheet.sampleCount }, (_, i) => i + 1);
+    const head = ['항목', '기준', ...samples.map(n => `시료 ${n}`)].map((text, col) => el('th', col > 1 ? 'num' : null, text));
+    $('inspection-head').replaceChildren(...head);
+
+    const rows = sheet.items.map(item => {
+        const tr = el('tr');
+        tr.append(el('td', null, item.inspectName), el('td', null, specRange(item)));
+        item.samples.forEach(s => tr.append(el('td', `num ${s.judgement === 'NG' ? 'ng' : ''}`, qty(s.value))));
+        return tr;
+    });
+    $('inspection-rows').replaceChildren(...rows);
+
+    const sub = $('inspection-sub');
+    if (sheet.judgement) {
+        sub.replaceChildren(`— ${sheet.processName} · ${time(sheet.measuredAt)} · ${sheet.workerId} `, judgementBadge(sheet.judgement));
+    } else {
+        sub.textContent = `— ${sheet.processName} · 아직 검사하지 않았습니다`;
     }
 }
 

@@ -111,3 +111,10 @@
 .hold .hold-button { border-color: var(--down); background: var(--down); color: #fff; font-weight: 600; }
 .hold-result { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--bg); }
 .hold-result.error { background: #fdecec; color: var(--down); }
+
+/* 검사: 시료가 많으면 표만 가로로 스크롤. 기준을 벗어난 값은 빨갛게 */
+.table-scroll { overflow-x: auto; }
+#inspection-rows td.ng { color: var(--down); font-weight: 700; }
+.judge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #fff; }
+.judge.OK { background: var(--run); }
+.judge.NG { background: var(--down); }

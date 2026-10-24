@@ -537,6 +537,57 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.history[2].note").value("치수 불량 의심 (원인 LOT " + bar + ")"));
     }
 
+    @Test
+    @DisplayName("검사 (seed 기준, CHAR(2) 판정, 시료 UNIQUE): 선삭 LOT 검사표 → 외경 NG → 이 LOT과 밀링 LOT 자동 보류, 같은 값 재전송은 200, 다른 값은 409")
+    void inspection() throws Exception {
+        String bar = receiveBar(10);
+        String created = mockMvc.perform(post("/api/work-orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemCode\":\"FG-SFT-100\",\"planQty\":10}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        int op10 = JsonPath.read(created, "$.operations[0].woOpId");
+        int op20 = JsonPath.read(created, "$.operations[1].woOpId");
+        startOperation(op10);
+        String turned = reportLot(op10, 5, 0, bar, 5);
+        startOperation(op20);
+        String milled = reportLot(op20, 2, 0, turned, 2);
+
+        mockMvc.perform(get("/api/lots/{lotNo}/inspection", turned))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.processName").value("CNC 선삭"))
+                .andExpect(jsonPath("$.items[*].inspectCode").value(contains("OD", "RA")))
+                .andExpect(jsonPath("$.items[0].lsl").value(37.95))
+                .andExpect(jsonPath("$.items[1].lsl").doesNotExist())
+                .andExpect(jsonPath("$.judgement").doesNotExist());
+
+        mockMvc.perform(post("/api/lots/{lotNo}/inspection", turned).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W1001\",\"measurements\":[{\"inspectCode\":\"OD\",\"sampleNo\":1}]}"))
+                .andExpect(status().isBadRequest());
+
+        String ng = "{\"workerId\":\"W1001\",\"measurements\":["
+                + "{\"inspectCode\":\"OD\",\"sampleNo\":1,\"value\":38.01},{\"inspectCode\":\"OD\",\"sampleNo\":2,\"value\":38.06},"
+                + "{\"inspectCode\":\"RA\",\"sampleNo\":1,\"value\":1.2},{\"inspectCode\":\"RA\",\"sampleNo\":2,\"value\":1.4}]}";
+        mockMvc.perform(post("/api/lots/{lotNo}/inspection", turned).contentType(MediaType.APPLICATION_JSON).content(ng))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.judgement").value("NG"))
+                .andExpect(jsonPath("$.status").value("HOLD"))
+                .andExpect(jsonPath("$.sampleCount").value(2))
+                .andExpect(jsonPath("$.items[0].samples[1].judgement").value("NG"))
+                .andExpect(jsonPath("$.heldLotNos").value(contains(turned, milled)));
+        mockMvc.perform(post("/api/lots/{lotNo}/inspection", turned).contentType(MediaType.APPLICATION_JSON).content(ng))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.judgement").value("NG"));
+        mockMvc.perform(post("/api/lots/{lotNo}/inspection", turned).contentType(MediaType.APPLICATION_JSON)
+                        .content(ng.replace("38.06", "38.02")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INSPECTION_DONE"));
+
+        mockMvc.perform(get("/api/lots/{lotNo}", milled))
+                .andExpect(jsonPath("$.lot.status").value("HOLD"))
+                .andExpect(jsonPath("$.history[*].eventType").value(contains("PRODUCE", "HOLD")))
+                .andExpect(jsonPath("$.history[1].note").value("검사 불합격: 외경 #2 38.06 (상한 38.05) (원인 LOT " + turned + ")"));
+    }
+
     private String receiveBar(int qty) throws Exception {
         String body = mockMvc.perform(post("/api/lots/receive").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"itemCode\":\"RM-SCM-001\",\"qty\":" + qty + ",\"supplierLotNo\":\"SUP-IT\",\"workerId\":\"W1001\"}"))

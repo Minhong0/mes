@@ -96,6 +96,17 @@
         </section>
     </div>
 
+    <!-- 이 LOT을 만든 공정의 검사. 검사 항목이 없는 공정(원자재, 세척, 포장)이면 숨긴다 -->
+    <section id="inspection" class="panel" hidden>
+        <h2 class="chart-title">검사 <small id="inspection-sub"></small></h2>
+        <div class="table-scroll">
+            <table class="pareto-table">
+                <thead><tr id="inspection-head"></tr></thead>
+                <tbody id="inspection-rows"></tbody>
+            </table>
+        </div>
+    </section>
+
     <section class="panel">
         <h2 class="chart-title">이력 <small>— 일어난 순서대로</small></h2>
         <table class="pareto-table">

@@ -47,6 +47,18 @@ public class LotHoldService {
 
     public HoldResult hold(String lotNo, HoldCommand command) {
         checkAllowed(command.workerId());
+        return holdTargets(lotNo, command);
+    }
+
+    /**
+     * 규칙에 따른 자동 보류 (검사 불합격). 사람이 판단하는 보류가 아니라 역할을 보지 않고, 하위 LOT까지 막는다.
+     * 해제는 여전히 품질 담당·관리자만 한다.
+     */
+    public HoldResult holdByRule(String lotNo, String workerId, String reason) {
+        return holdTargets(lotNo, new HoldCommand(workerId, reason, true));
+    }
+
+    private HoldResult holdTargets(String lotNo, HoldCommand command) {
         LocalDateTime now = LocalDateTime.now(clock);
         List<Lot> changed = new ArrayList<>();
         List<Lot> skipped = new ArrayList<>();

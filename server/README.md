@@ -41,7 +41,7 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
 
 8. 실적에는 투입한 LOT(`inputs`)을 함께 보냅니다. 아래 LOT 추적을 참고하세요.
 
-이미 만든 DB에는 `db/ddl/07_work_result_request.sql`, `db/ddl/08_downtime_reason.sql`, `db/ddl/09_lot_tracking.sql`, `db/ddl/10_routing_lot_size.sql`, `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
+이미 만든 DB에는 `db/ddl/07_work_result_request.sql`, `db/ddl/08_downtime_reason.sql`, `db/ddl/09_lot_tracking.sql`, `db/ddl/10_routing_lot_size.sql`, `db/ddl/11_inspection.sql`, `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
 
 ## LOT 추적
 
@@ -73,6 +73,19 @@ http://localhost:8080/lots/trace 는 LOT 추적 화면입니다.
 - 화면은 모니터링 화면처럼 빈 틀(`templates/lot-trace.html`)이고, `static/js/lot-trace.js`가 두 API를 불러 그립니다.
 
 LOT 추적을 넣기 전에 시작한 작업지시는 앞 공정 LOT이 없어 두 번째 공정부터 실적을 등록할 수 없습니다. 새 작업지시로 확인합니다.
+
+## 검사
+
+LOT을 만든 공정(`lot.last_process`)의 검사 항목(`inspection_spec`)을 시료 여러 개로 재고, 서버가 하한·상한으로 판정합니다. 입력은 POP의 [검사] 탭에서 합니다.
+
+1. 검사표: `GET /api/lots/{lotNo}/inspection` → 검사 항목(하한·상한·단위)과, 이미 검사했으면 시료별 측정값과 판정. 검사 항목이 없는 공정(세척, 포장)과 원자재 LOT은 `items`가 빕니다.
+2. 등록: `POST /api/lots/{lotNo}/inspection` (`{"workerId":"W1001","measurements":[{"inspectCode":"OD","sampleNo":1,"value":38.01}, ...]}`)
+   - 모든 항목을 시료 1번부터 n번까지(최대 10) 빠짐없이 보내야 합니다. 빠지거나, 다른 공정 항목이거나, 같은 시료를 두 번 적으면 400.
+   - 값마다 하한 이상·상한 이하(경계 포함)면 OK, 아니면 NG. 한쪽 한계만 있는 항목(표면 거칠기는 상한만)은 다른 쪽을 보지 않습니다.
+   - 하나라도 NG면 LOT이 불합격이고, 같은 트랜잭션에서 이 LOT과 하위 LOT을 보류합니다(위 품질 보류와 같은 방식, 역할 확인 없음). 해제는 QC·ADMIN만 합니다.
+   - `lot_history`에 `INSPECT`(합격 또는 "불합격: 외경 #2 38.07 (상한 38.05)")를 남깁니다.
+   - LOT 하나는 공정마다 한 번 검사합니다. 같은 값을 다시 보내면 처음 결과를 돌려주고(응답을 못 받은 POP의 재전송), 다른 값이면 409 `INSPECTION_DONE`. `inspection_result`에 (LOT, 공정, 항목, 시료) UNIQUE 인덱스가 있습니다.
+3. 추적 화면(`/lots/trace`)에 검사 결과 표가 나옵니다. 기준을 벗어난 값은 빨갛게 보입니다.
 
 ## 진동·온도 관리한계 알람 (CBM)
 
@@ -165,6 +178,11 @@ com.minimes
 │  ├─ mapper      LotTraceMapper (정방향·역방향 재귀 CTE) → resources/mapper/lot/LotTraceMapper.xml
 │  ├─ service     LotService (공정에 투입할 품목, 투입 확인, 기록, 취소), LotHoldService (보류·해제)
 │  └─ web         LotController (/api/lots, 보류·해제, 공정 투입 LOT), LotPageController (/lots/trace 화면)
+├─ quality        검사 결과와 판정, 불합격 자동 보류
+│  ├─ domain      InspectionResult(시료 하나의 측정값과 판정), Judgement
+│  ├─ repository
+│  ├─ service     InspectionService (검사표, 빠짐 확인, 판정, 재전송 처리, 불합격이면 LotHoldService.holdByRule)
+│  └─ web         InspectionController (/api/lots/{lotNo}/inspection)
 ├─ production     일별 생산 실적 집계, OEE 조회
 │  ├─ domain      ProductionDaily (production_daily, 복합키)
 │  ├─ repository
@@ -222,6 +240,8 @@ com.minimes
 | GET | `/api/lots/{lotNo}/trace` | 역방향(`backward`)·정방향(`forward`) 추적 |
 | POST | `/api/lots/{lotNo}/hold` | 품질 보류 (`{"workerId":"W6001","reason":"...","includeDownstream":true}`). QC·ADMIN만 |
 | POST | `/api/lots/{lotNo}/release` | 보류 해제 (요청 형식은 보류와 같음) |
+| GET | `/api/lots/{lotNo}/inspection` | 검사표: LOT을 만든 공정의 검사 항목과 측정값·판정 |
+| POST | `/api/lots/{lotNo}/inspection` | 검사 등록 (`{"workerId":"W1001","measurements":[{"inspectCode":"OD","sampleNo":1,"value":38.01}]}`). NG면 자동 보류 |
 | GET | `/api/monitoring/dashboard` | 설비 현황 (현재 상태, 정지 사유, 센서값, 오늘 OEE) |
 | GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
 | GET | `/api/oee/monthly?month=2025-10` | 설비별 월별 OEE (시간·수량 합산 후 계산) |
