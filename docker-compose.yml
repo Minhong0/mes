@@ -1,5 +1,11 @@
-# 로컬 개발용 인프라: MSSQL + MQTT 브로커
-# 실행: cp .env.example .env 후 docker compose up -d
+# Mini-MES 실행 (먼저 cp .env.example .env)
+#
+#   전체:      docker compose --profile app up -d --build
+#              MSSQL + MQTT 브로커 + DB 초기화 + MES 서버(http://localhost:8080) + 설비 시뮬레이터
+#   개발할 때: docker compose up -d
+#              MSSQL + MQTT 브로커 + DB 초기화만. 서버는 IDE에서, 시뮬레이터는 dotnet run으로 실행한다
+#
+# POP(WPF)는 Windows 프로그램이라 컨테이너로 띄우지 않는다: dotnet run --project pop/MiniMes.Pop
 services:
   mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -28,6 +34,64 @@ services:
       - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
       - mosquitto-data:/mosquitto/data   # 영속 세션과 쌓인 메시지 (브로커를 재시작해도 남는다)
 
+  # 스키마와 초기 데이터를 넣고 끝나는 컨테이너. 새 볼륨이면 전부, 이미 만든 DB면 추가된 DDL만 (db/init/init-db.sh)
+  db-init:
+    image: mcr.microsoft.com/mssql/server:2022-latest   # sqlcmd가 들어 있는 같은 이미지를 쓴다
+    container_name: minimes-db-init
+    entrypoint: ["/bin/bash", "/db/init/init-db.sh"]
+    environment:
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      DB_HOST: mssql
+    volumes:
+      - ./db:/db:ro
+    depends_on:
+      mssql:
+        condition: service_healthy
+    restart: "no"
+
+  server:
+    profiles: [app]
+    build: ./server
+    container_name: minimes-server
+    environment:
+      DB_HOST: mssql
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
+      MQTT_URL: tcp://mosquitto:1883
+      TZ: Asia/Seoul
+    ports:
+      - "8080:8080"
+    depends_on:
+      db-init:
+        condition: service_completed_successfully   # 스키마가 준비된 뒤에 뜬다 (ddl-auto: validate)
+      mosquitto:
+        condition: service_started
+    healthcheck:   # 8080이 열리면 준비된 것으로 본다 (Spring은 시작을 다 마친 뒤 포트를 연다)
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+  simulator:
+    profiles: [app]
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    container_name: minimes-simulator
+    command: ["--speed", "60"]   # 공장 시계 60배속: 현실 1초 = 공장 1분
+    environment:
+      MQTT_HOST: mosquitto
+      SIM_OUTBOX: /data/outbox.db
+      TZ: Asia/Seoul
+    volumes:
+      - simulator-data:/data       # 보내지 못한 메시지와 공장 시계 (재시작해도 이어서)
+    depends_on:
+      server:
+        condition: service_healthy   # 서버가 브로커에 먼저 구독해야 첫 메시지부터 받는다
+    restart: unless-stopped
+
 volumes:
   mssql-data:
   mosquitto-data:
+  simulator-data:

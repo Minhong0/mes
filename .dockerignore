@@ -1,0 +1,8 @@
+# 저장소 루트를 빌드 위치로 쓰는 이미지(시뮬레이터)는 필요한 파일만 넣는다.
+# 부트캠프 원본 엑셀(data/raw, *.xlsx)과 빌드 결과물은 들어가지 않는다.
+*
+!simulator/MiniMes.Simulator/
+simulator/MiniMes.Simulator/bin/
+simulator/MiniMes.Simulator/obj/
+!data/master/equipment.csv
+!data/profile/downtime_events.csv

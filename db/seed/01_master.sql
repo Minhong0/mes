@@ -153,4 +153,12 @@ INSERT INTO worker (worker_id, worker_name, wc_code, role) VALUES
     ('W4001', N'정민재', 'WC-400', 'OPERATOR'),
     ('W6001', N'강예린', 'WC-600', 'QC'),
     ('W9001', N'윤서연', NULL, 'ADMIN');
+
+-- tool: 5건
+INSERT INTO tool (tool_code, tool_name, tool_type, equip_code, life_count) VALUES
+    ('T-CNC01-INS', N'CNC01 선삭 인서트', 'INSERT', 'CNC01', 120),
+    ('T-CNC02-INS', N'CNC02 선삭 인서트', 'INSERT', 'CNC02', 120),
+    ('T-CNC03-EM', N'CNC03 키홈 엔드밀', 'ENDMILL', 'CNC03', 90),
+    ('T-CNC04-EM', N'CNC04 키홈 엔드밀', 'ENDMILL', 'CNC04', 90),
+    ('T-CNC05-WHL', N'CNC05 연삭석', 'WHEEL', 'CNC05', 200);
 GO

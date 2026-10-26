@@ -4,7 +4,7 @@
 
 - **서버**: Java 21, Spring Boot 4, JPA + MyBatis, MSSQL, Thymeleaf + 순수 JS 화면
 - **현장 프로그램**: C# .NET 8 — WPF POP 단말(MVVM), 설비 시뮬레이터(MQTT)
-- **테스트**: 서버 116개(H2), 실제 MSSQL 통합 테스트 16개(Testcontainers), POP 39개(xUnit)
+- **테스트**: 서버 122개(H2), 실제 MSSQL 통합 테스트 17개(Testcontainers), POP 39개(xUnit)
 
 ![설비 현황: CNC03 온도 관리한계 초과 알람](docs/images/monitoring.png)
 
@@ -17,7 +17,7 @@
 | 제품 추적·품질 역추적 | 공정별 수기 관리로 이력이 끊기고 불량 보고는 종이 | 고객사의 납품 이력 추적 요구 | LOT 발행·병합·분할, 정/역방향 추적, 검사 판정, 품질 보류 |
 | 실시간 생산 모니터링 | 종이 작업일보를 다음 날 엑셀에 입력, 작업지시는 구두·화이트보드 | 생산 진도 파악이 하루 늦음 | 작업지시, POP 실적, 설비 자동 수집, 실시간 대시보드 |
 | CBM 예방 보전 | 고장은 구두 보고, 수리 이력 누락 | CNC03 OEE 59.18%, 스핀들 이상 정지 811분 | 비가동 기록, OEE, 정지 사유 파레토, 진동·온도 관리한계 알람 |
-| 셋업 최적화 | 공구 교체 시점이 작업자 경험에 의존 | 품번 교체·셋업이 정지 사유 1위 | 정지 사유 파레토 (공구 수명 관리는 다음 단계) |
+| 셋업 최적화 | 공구 교체 시점이 작업자 경험에 의존 | 품번 교체·셋업이 정지 사유 1위, 10월 공구 교체 63회 | 정지 사유 파레토, 공구 수명 관리 (설비 카운트로 사용 수량, 수명 도달 알람) |
 | 자재 청구 자동화 | 자재 불출을 구두·메신저로 요청 | 재고 오차 10~15% | 원자재 LOT 입고까지 (불출·재고는 범위 밖) |
 
 OEE는 2차 자료의 계산 방식(시간·수량을 합산한 뒤 비율 계산)을 그대로 따르고, 엑셀 정답값(2025년 10월 CNC01 84.24%, CNC03 59.18%)과 같은지 MSSQL 통합 테스트로 확인합니다.
@@ -87,6 +87,14 @@ flowchart LR
 - 관리한계 알람: 정상 가동 데이터로 진동·온도의 UCL(평균 + 3σ)을 정해 두고, 넘으면 알람을 띄웁니다.
 - 정지 사유 파레토: 누적 80%까지를 중점 관리 대상으로 표시합니다.
 
+### 공구 수명
+
+![공구 수명: 설비 카운트로 센 사용 수량, 교체 필요, 교체 이력](docs/images/tools.png)
+
+- 공구마다 설치한 뒤 설비가 가공한 수량을 세고, 수명의 90%면 교체 임박, 수명에 이르면 설비 현황에 알람을 띄웁니다.
+- 수명은 2차 자료에서 정했습니다: 2025년 10월 생산 수량 ÷ 공구 교체 횟수 (인서트 120개, 엔드밀 90개). 연삭석은 3차 자료의 참고치 200개입니다.
+- [교체]를 누르면 바꾼 공구가 가공한 수량을 이력에 남기고 0부터 다시 셉니다. 그 공구의 알람은 바꾼 사람이 확인한 것으로 닫힙니다.
+
 ### 관리자 웹
 
 ![작업지시: 만들기, 상태별 목록, 공정 진행, 납기 지남](docs/images/work-orders.png)
@@ -100,6 +108,7 @@ flowchart LR
 | 응답을 못 받은 POP가 다시 보내면 실적이 두 번 생김 | POP가 만든 요청 ID에 UNIQUE 제약. 같은 ID면 처음 결과를 돌려줌. 보내기 전에 단말 파일에 적어 POP가 꺼져도 같은 ID로 재전송 |
 | 통신이 끊긴 동안의 설비 데이터 유실 | 시뮬레이터가 SQLite outbox에 쌓고 재전송, 서버는 messageId로 중복 제거, MQTT 영속 세션(QoS 1) |
 | 두 단말이 같은 LOT을 동시에 투입하면 수량이 틀어짐 | 투입 LOT을 `UPDLOCK`으로 잠그고 읽음. 뒤 요청은 앞 요청이 커밋할 때까지 기다렸다가 줄어든 수량을 읽음 |
+| 공구 사용 수량을 메시지마다 1씩 더하면 늦게 온 메시지·재시작한 카운트에서 틀어짐 | 설치 시각부터의 누적 카운트를 매번 다시 셈 (생산 실적과 같은 규칙). 설치 시각은 설비의 공장 시계로 잡아 배속 실행에서도 구간이 맞음 |
 | 깊이를 모르는 LOT 계보 추적 | MyBatis 재귀 CTE. 취소한 실적의 계보는 지우지 않고 추적 쿼리에서 거름 |
 | 보류 대상을 추적하는 사이 다른 실적이 하위 LOT을 만듦 | 대상 LOT을 잠근 뒤 다시 추적하고, 새로 나온 LOT이 없을 때까지 반복 |
 | 관리한계를 새 데이터로 자동 갱신하면 서서히 나빠지는 설비를 놓침 | 한계를 기준 기간·표본 수와 함께 저장하고 자동으로 바꾸지 않음 |
@@ -109,29 +118,37 @@ flowchart LR
 
 ## 실행 방법
 
-필요한 것: Docker Desktop, JDK 21, .NET 8 SDK (POP는 Windows)
+Docker Desktop만 있으면 서버·DB·브로커·설비 시뮬레이터가 한 번에 뜹니다.
 
 ```bash
-# 1. DB와 MQTT 브로커
-cp .env.example .env          # DB 비밀번호
-docker compose up -d
-#    처음 한 번 DDL과 seed를 넣습니다: db/README.md 참고
+cp .env.example .env                              # DB 비밀번호
+docker compose --profile app up -d --build        # 처음에는 이미지를 만드느라 몇 분 걸립니다
+```
 
-# 2. 서버 → http://localhost:8080 (관리자 웹), /swagger-ui.html (API)
-cd server && ./gradlew bootRun
+- http://localhost:8080 관리자 웹 (설비 현황, 파레토, 공구 수명, 작업지시, LOT 추적, 보류 LOT), `/swagger-ui.html` API 문서
+- 처음 뜰 때 DB 스키마와 초기 데이터(기준정보, 부트캠프 2025년 10월 실적)를 자동으로 넣습니다.
+- 설비 시뮬레이터는 60배속(현실 1초 = 공장 1분)으로 CNC01~05 데이터를 보냅니다.
+- 끄기: `docker compose --profile app down` (데이터는 남음). DB까지 지우고 처음부터: `docker compose --profile app down -v`
 
-# 3. 설비 시뮬레이터 (60배속: 현실 1초 = 공장 1분)
-dotnet run --project simulator/MiniMes.Simulator -- --speed 60
+POP는 Windows WPF 프로그램이라 따로 실행합니다 (.NET 8 SDK 필요).
 
-# 4. POP (사번 W1001 선삭, W2001 밀링, W6001 품질, W9001 관리자)
-dotnet run --project pop/MiniMes.Pop
+```bash
+dotnet run --project pop/MiniMes.Pop    # 사번 W1001 선삭, W2001 밀링, W6001 품질, W9001 관리자
+```
+
+개발할 때는 DB와 브로커만 띄우고 서버·시뮬레이터를 직접 실행합니다 (JDK 21, .NET 8 SDK).
+
+```bash
+docker compose up -d                                              # MSSQL, MQTT 브로커, DB 초기화
+cd server && ./gradlew bootRun                                    # 서버
+dotnet run --project simulator/MiniMes.Simulator -- --speed 60    # 시뮬레이터
 ```
 
 ## 테스트
 
 ```bash
-cd server && ./gradlew test               # H2, 116개
-cd server && ./gradlew integrationTest    # 실제 MSSQL (Docker 필요), 16개
+cd server && ./gradlew test               # H2, 122개
+cd server && ./gradlew integrationTest    # 실제 MSSQL (Docker 필요), 17개
 dotnet test pop/MiniMes.Pop.Tests         # POP 화면 로직, 39개
 ```
 
@@ -143,9 +160,10 @@ dotnet test pop/MiniMes.Pop.Tests         # POP 화면 로직, 39개
 | [`pop/`](pop/README.md) | 현장 POP 단말: 작업, 설비 정지, 검사 | C# .NET 8, WPF (MVVM, CommunityToolkit), xUnit |
 | `simulator/` | 설비 CNC01~05 시뮬레이터 | C# .NET 8, MQTTnet, SQLite |
 | [`db/`](db/README.md) | DDL, seed SQL | MSSQL |
-| [`data/master/`](data/master/README.md) | 기준정보 CSV (품목, BOM, 라우팅, 설비, 검사 규격, 작업자) | CSV |
+| [`data/master/`](data/master/README.md) | 기준정보 CSV (품목, BOM, 라우팅, 설비, 검사 규격, 작업자, 공구) | CSV |
 | `tools/` | 부트캠프 엑셀과 CSV를 검증해 seed SQL로 바꾸는 스크립트 | Python |
 | `infra/` | MQTT 브로커 설정 | Mosquitto |
+| `docker-compose.yml` | 전체 실행 (DB 초기화 컨테이너, 서버·시뮬레이터 이미지) | Docker Compose |
 | `docs/` | [ERD](docs/erd.md), [기술 결정](docs/decisions.md), 화면 캡처 | Markdown |
 
 부트캠프 원본 엑셀은 저작권 문제로 저장소에 넣지 않았습니다. 기준정보는 CSV로 옮겨 이름을 바꿨습니다.

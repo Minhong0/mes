@@ -1,12 +1,14 @@
 // 설비 시뮬레이터: 자동 수집 대상 설비(CNC01~05)가 동시에 가동·정지하며 데이터를 MQTT로 보낸다.
 // 실행: dotnet run --project simulator/MiniMes.Simulator -- --speed 60   (먼저 docker compose up -d)
 //   --speed: 배속. 60이면 시뮬레이션 1분 = 현실 1초 (기본 60)
+//   환경 변수 MQTT_HOST: 브로커 주소 (기본 localhost. 컨테이너에서는 mosquitto)
+//   환경 변수 SIM_OUTBOX: 로컬 버퍼 파일 (기본 실행 폴더의 outbox.db. 컨테이너에서는 볼륨 안)
 // 종료: Ctrl+C
 
 using System.Globalization;
 using MiniMes.Simulator;
 
-const string BrokerHost = "localhost";
+var brokerHost = Environment.GetEnvironmentVariable("MQTT_HOST") ?? "localhost";
 const int BrokerPort = 1883;
 
 var speed = ReadSpeed(args);
@@ -26,10 +28,10 @@ Console.WriteLine($"설비 {specs.Count}대: " + string.Join(", ", specs.Select(
 Console.WriteLine($"배속 x{speed}: 시뮬레이션 1분 = 현실 {60 / speed:0.####}초");
 
 // 2) 로컬 버퍼와 보내는 담당 준비. 연결은 보내는 담당이 알아서 하므로, 브로커가 꺼져 있어도 시뮬레이터는 시작한다.
-var bufferPath = Path.Combine(AppContext.BaseDirectory, "outbox.db");
+var bufferPath = Environment.GetEnvironmentVariable("SIM_OUTBOX") ?? Path.Combine(AppContext.BaseDirectory, "outbox.db");
 using var buffer = new MessageBuffer(bufferPath);
 Console.WriteLine($"로컬 버퍼: {bufferPath} (이전 실행에서 못 보낸 메시지 {buffer.Count()}건)");
-await using var publisher = new MqttPublisher(BrokerHost, BrokerPort, buffer);
+await using var publisher = new MqttPublisher(brokerHost, BrokerPort, buffer);
 
 // 3) 공장 시계의 시작 시각: 지금과 지난 실행의 마지막 공장 시각 중 늦은 쪽.
 //    배속으로 돌리면 공장 시계가 현실보다 앞서 가므로, 다시 실행할 때 현실 시각으로 돌아가면 시간이 거꾸로 흐르게 된다.

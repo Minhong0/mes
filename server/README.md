@@ -12,9 +12,12 @@ Java 21, Spring Boot 4.0, JPA + MyBatis, MSSQL.
 ## 실행
 
 1. 저장소 루트에서 `docker compose up -d`로 MSSQL과 MQTT 브로커를 띄웁니다. DB와 초기 데이터는 [db/README.md](../db/README.md)를 참고하세요.
+   스키마와 초기 데이터는 `db-init` 컨테이너가 자동으로 넣습니다.
 2. `MesServerApplication`의 ▶ 버튼으로 실행합니다. DB 비밀번호는 저장소 루트의 `.env`에서 자동으로 읽습니다.
 3. http://localhost:8080/swagger-ui.html 에서 API를 확인하고 직접 호출해 볼 수 있습니다.
 4. 설비 시뮬레이터(`simulator/MiniMes.Simulator`에서 `dotnet run`)를 실행하면, 서버의 MQTT 수집기가 메시지를 받아 `equipment_data`에 저장합니다.
+
+컨테이너로 실행할 때는 저장소 루트에서 `docker compose --profile app up -d --build`. `Dockerfile`이 JDK로 실행 jar를 만들고 JRE 이미지에서 실행합니다. DB·브로커 주소는 환경 변수(`DB_HOST`, `MQTT_URL`)로 바꿉니다.
 
 ## 관리자 화면
 
@@ -30,6 +33,18 @@ http://localhost:8080/work-orders
   - 납기가 지났는데 대기·진행이면 "지연"으로 표시합니다.
 - **버튼**: 대기면 [시작], 완료면 [마감]. 완료는 모든 공정이 끝나면 서버가 바꾸므로 버튼이 없습니다.
 - 목록은 한 번에 모두 읽고 화면에서 거릅니다. 위의 숫자(대기, 진행, 완료, 납기 지남)는 늘 전체 기준입니다.
+
+### 공구 수명
+
+http://localhost:8080/tools
+
+- 공구(`tool`)마다 설치한 뒤 설비가 가공한 수량을 30초마다 다시 셉니다 (`ToolLifeScheduler`, `mes.tool-life.interval`).
+  - 메시지마다 1씩 더하지 않고, 설치 시각부터의 누적 카운트(`cycleCount`)를 매번 처음부터 셉니다. 일별 생산 실적과 같은 규칙(`ProducedCounter`)이라 시뮬레이터 재시작(카운트가 0부터)과 늦게 온 메시지에도 같은 결과가 나옵니다.
+  - 설치·교체 시각은 그 설비의 마지막 메시지 시각(공장 시계)입니다. 배속으로 돌리면 공장 시계가 서버 시계보다 앞서 가므로 서버 시각으로 자르면 구간이 틀어집니다.
+- 수명의 90% 이상이면 교체 임박(`WARN`), 수명에 이르면 교체 필요(`REPLACE`)와 `TOOL_LIFE` 알람(설비 현황 카드).
+  - 알람은 공구를 한 번 설치한 동안 한 번만 냅니다. 확인해도 다시 생기지 않습니다 (바꾸기 전까지 계속 수명을 넘어 있으므로).
+- [교체] (`POST /api/tools/{toolCode}/change`, 사번·사유): 바꾸기 직전까지 다시 센 수량을 `tool_change_history`에 남기고 0부터 다시 셉니다. 그 공구의 열린 알람은 바꾼 사람이 확인한 것으로 닫습니다.
+- 공구와 수명은 `data/master/tools.csv` (근거는 `data/master/README.md`). 이미 만든 DB에는 `db/ddl/12_tool_life.sql`이 넣습니다.
 
 ### 보류 LOT
 
@@ -207,6 +222,11 @@ com.minimes
 │  ├─ repository
 │  ├─ service     InspectionService (검사표, 빠짐 확인, 판정, 재전송 처리, 불합격이면 LotHoldService.holdByRule)
 │  └─ web         InspectionController (/api/lots/{lotNo}/inspection)
+├─ tool           공구 수명: 사용 수량 세기, 수명 알람, 교체와 이력
+│  ├─ domain      Tool(사용 수량, 상태 OK/WARN/REPLACE), ToolChange(교체 이력), ToolType
+│  ├─ repository
+│  ├─ service     ToolLifeService (다시 세기, 교체), ToolLifeScheduler (30초마다)
+│  └─ web         ToolController (/api/tools), ToolPageController (/tools 화면)
 ├─ production     일별 생산 실적 집계, OEE 조회
 │  ├─ domain      ProductionDaily (production_daily, 복합키)
 │  ├─ repository
@@ -260,6 +280,9 @@ com.minimes
 | PUT | `/api/downtimes/{downtimeId}/reason` | 정지 사유 확정 (`{"workerId":"W1001","dtCat":"MATERIAL","dtSub":"MAT_NOT_RECEIVED","note":"..."}`) |
 | POST | `/api/lots/receive` | 원자재 입고 (`{"itemCode":"RM-SCM-001","qty":100,"supplierLotNo":"A-1018","workerId":"W1001"}`) |
 | GET | `/api/lots?itemCode=RM-SCM-001&status=ACTIVE` | 품목의 LOT 목록 (최근 100개) |
+| GET | `/api/tools` | 공구 목록 (사용 수량, 수명, 남은 수량, 상태) |
+| POST | `/api/tools/{toolCode}/change` | 공구 교체 (`{"workerId":"W4001","reason":"수명 도달"}`). 응답에 새 공구와 남긴 이력 |
+| GET | `/api/tools/changes?toolCode=T-CNC05-WHL` | 교체 이력 (최근 50건, toolCode 생략 가능) |
 | GET | `/api/lots/held` | 보류 중인 LOT과 마지막 보류 (사유, 원인 LOT, 검사 불합격인가) |
 | GET | `/api/lots/{lotNo}` | LOT과 이력 (공정 이름 포함) |
 | GET | `/api/lots/{lotNo}/trace` | 역방향(`backward`)·정방향(`forward`) 추적 |

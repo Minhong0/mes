@@ -8,6 +8,17 @@
 
 ERD와 설계 이유는 [docs/erd.md](../docs/erd.md)에 있습니다.
 
+## 자동 실행 (docker compose)
+
+`docker compose up -d`를 하면 `db-init` 컨테이너가 `init/init-db.sh`를 실행하고 끝납니다.
+
+- 테이블이 없으면(새 볼륨): `ddl/` 전부를 번호 순서대로, 그다음 `seed/`를 넣습니다.
+- 테이블이 있으면(이미 만든 DB): 없을 때만 추가하는 `06`번부터 다시 실행해, 새로 생긴 DDL을 반영합니다 (지금은 `12_tool_life.sql`까지).
+- 기준정보가 비어 있으면 seed를 넣습니다. 몇 번을 실행해도 결과가 같습니다.
+- 결과 보기: `docker logs minimes-db-init`
+
+새 DDL 파일을 더할 때는 이미 만든 DB에 다시 실행해도 되게 "없을 때만" 만들고, 번호를 이어 붙입니다 (`12_...`).
+
 ## 수동 실행 방법
 
 `docker compose up -d`로 MSSQL 컨테이너를 띄운 뒤, 저장소 루트에서 실행합니다 (Git Bash 기준).
