@@ -60,18 +60,19 @@ MASTER_TABLES = [
     ("equipment", "equipment"),
     ("inspection_specs", "inspection_spec"),
     ("workers", "worker"),
+    ("tools", "tool"),
 ]
 
 # CSV에서 숫자로 넣을 컬럼. 나머지는 문자열로 넣는다.
 NUMERIC_COLUMNS = {
     "qty", "std_time_min", "batch_max_qty", "setup_time_min", "workers", "install_year",
-    "ideal_ct_min", "planned_min_per_day", "nominal", "lsl", "usl", "sort_order", "lot_size",
+    "ideal_ct_min", "planned_min_per_day", "nominal", "lsl", "usl", "sort_order", "lot_size", "life_count",
 }
 
 # 한글이 들어갈 수 있는 컬럼은 N'...'(NVARCHAR)로 넣는다.
 UNICODE_COLUMNS = {
     "code_name", "group_name", "item_name", "spec", "note", "process_name", "department",
-    "wc_name", "location", "equip_name", "inspect_name", "worker_name",
+    "wc_name", "location", "equip_name", "inspect_name", "worker_name", "tool_name",
 }
 
 
@@ -178,6 +179,8 @@ def validate_master(m: dict[str, list[dict[str, str]]]) -> None:
     for r in m["inspection_specs"]:
         check("inspection_specs.process_code", r["process_code"], processes)
         check("inspection_specs.equip_code", r["equip_code"], equipment, allow_empty=True)
+    for r in m["tools"]:
+        check("tools.equip_code", r["equip_code"], equipment)
     for r in m["common_codes"]:
         if r["group_code"] not in CODE_GROUP_NAMES:
             errors.append(f"common_codes: 그룹 '{r['group_code']}'의 이름이 CODE_GROUP_NAMES에 없습니다.")

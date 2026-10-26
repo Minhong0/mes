@@ -1,0 +1,25 @@
+/* 공구 수명. 타일·표는 pareto.css, 입력 칸·작은 글씨(.code)·버튼은 work-orders.css를 그대로 쓴다. */
+
+.change-form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 16px; font-size: 14px; }
+.change-form label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 13px; }
+.change-reason { flex: 1 1 240px; }
+.change-form input { font: inherit; font-size: 14px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--text); }
+.change-form .form-result { flex-basis: 100%; margin: 0; }
+
+.tool-table { min-width: 860px; }
+.tool-table td { vertical-align: middle; }
+.tool-table tr.over td { background: #fdecec; }
+.strong { font-weight: 600; }
+.when { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* 사용 / 수명 막대 */
+.usage { min-width: 200px; }
+.usage-text { display: block; font-variant-numeric: tabular-nums; font-size: 13px; }
+.bar { height: 8px; margin-top: 4px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.bar span { display: block; height: 100%; background: var(--run); }
+.bar.WARN span { background: var(--setup); }
+.bar.REPLACE span { background: var(--down); }
+
+.tool-state { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; background: var(--run); }
+.tool-state.WARN { background: var(--setup); }
+.tool-state.REPLACE { background: var(--down); }

@@ -1,6 +1,7 @@
 package com.minimes.monitoring.push;
 
 import com.minimes.alarm.service.AlarmAcknowledgedEvent;
+import com.minimes.alarm.service.ToolAlarmRaisedEvent;
 import com.minimes.equipment.service.DowntimeReasonChangedEvent;
 import com.minimes.equipment.service.EquipmentDataSavedEvent;
 import com.minimes.monitoring.service.MonitoringService;
@@ -49,6 +50,11 @@ public class DashboardPusher {
     @TransactionalEventListener
     public void onAlarmAcknowledged(AlarmAcknowledgedEvent event) {
         changed.set(true);
+    }
+
+    @TransactionalEventListener
+    public void onToolAlarmRaised(ToolAlarmRaisedEvent event) {
+        changed.set(true);   // 설비 카드에 공구 수명 알람이 뜬다
     }
 
     @TransactionalEventListener

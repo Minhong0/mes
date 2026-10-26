@@ -123,13 +123,17 @@ function renderCard(eq) {
 function renderAlarm(alarm) {
     const info = ALARM_LABEL[alarm.alarmType] ?? { name: alarm.alarmType, unit: '', digits: 2 };
     const value = v => Number(v).toFixed(info.digits);
+    // 공구 수명은 두 줄("T-CNC05-WHL" / "사용 200 / 수명 200개"), 관리한계는 한 줄("40.4 °C · UCL 39.0"). 카드 폭에 맞춘다
+    const details = alarm.alarmType === 'TOOL_LIFE'
+        ? [alarm.toolCode, `사용 ${value(alarm.measuredValue)} / 수명 ${value(alarm.limitValue)}개`]
+        : [`${value(alarm.measuredValue)} ${info.unit} · UCL ${value(alarm.limitValue)}`];
     const button = el('button', 'ack', '확인');
     button.type = 'button';
     button.addEventListener('click', () => acknowledge(alarm.alarmId, button));
     return el('div', 'alarm', null, [
         el('div', null, null, [
             el('strong', null, info.name),
-            el('span', null, `${value(alarm.measuredValue)} ${info.unit} · UCL ${value(alarm.limitValue)}`),
+            ...details.map(text => el('span', null, text)),
             el('span', null, `${formatDateTime(alarm.occurredAt)}부터`),
         ]),
         button,

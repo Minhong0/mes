@@ -20,6 +20,13 @@ public interface EquipmentDataRepository extends JpaRepository<EquipmentData, Lo
     /** from 직전의 마지막 메시지. 그날 첫 메시지의 누적 수량과 비교할 기준이 된다 */
     Optional<EquipmentData> findFirstByEquipCodeAndCollectedAtLessThanOrderByCollectedAtDesc(String equipCode, LocalDateTime from);
 
+    /** after보다 뒤의 메시지, 측정 시각 순 (공구 사용 수량) */
+    List<EquipmentData> findByEquipCodeAndCollectedAtGreaterThanOrderByCollectedAt(String equipCode, LocalDateTime after);
+
+    /** after 시각까지(포함)의 마지막 메시지. 공구를 단 순간의 누적 수량이 기준이 된다 */
+    Optional<EquipmentData> findFirstByEquipCodeAndCollectedAtLessThanEqualOrderByCollectedAtDesc(String equipCode,
+                                                                                                 LocalDateTime after);
+
     /** 설비의 가장 최근 메시지. 아직 끝나지 않은 상태가 "지금"까지 이어졌다고 볼 때 그 "지금"이다 */
     Optional<EquipmentData> findFirstByEquipCodeOrderByCollectedAtDesc(String equipCode);
 

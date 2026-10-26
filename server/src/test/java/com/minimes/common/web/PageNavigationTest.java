@@ -29,6 +29,7 @@ class PageNavigationTest {
     @CsvSource({
             "/monitoring,        monitoring,  설비 현황,       data-api-url=\"/api/monitoring/dashboard\"",
             "/monitoring/pareto, pareto,      정지 사유 파레토, data-api-url=\"/api/monitoring/downtime-pareto\"",
+            "/tools,             tools,       공구 수명,       data-tools-url=\"/api/tools\"",
             "/work-orders,       work-orders, 작업지시,        data-wo-url=\"/api/work-orders\"",
             "/lots/trace,        lot-trace,   LOT 추적,       data-lots-url=\"/api/lots\"",
             "/lots/hold,         lot-hold,    보류 LOT,       data-held-url=\"/api/lots/held\"",

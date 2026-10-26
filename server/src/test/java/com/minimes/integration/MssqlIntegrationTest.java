@@ -596,6 +596,30 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$[?(@.lotNo == '" + turned + "')].byInspection").value(hasItem(true)));
     }
 
+    @Test
+    @DisplayName("공구 수명 (seed 공구 5개, DDL 12는 빈 DB에서 건너뜀): 목록, 교체하면 이력이 남고 0부터")
+    void toolLife() throws Exception {
+        mockMvc.perform(get("/api/tools"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5))
+                .andExpect(jsonPath("$[?(@.toolCode == 'T-CNC05-WHL')].lifeCount").value(hasItem(200)))
+                .andExpect(jsonPath("$[?(@.toolCode == 'T-CNC01-INS')].equipName").value(hasItem("CNC 선반 #1")));
+
+        mockMvc.perform(post("/api/tools/{code}/change", "T-CNC04-EM").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W2001\",\"reason\":\"파손\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tool.usedCount").value(0))
+                .andExpect(jsonPath("$.tool.state").value("OK"))
+                .andExpect(jsonPath("$.change.reason").value("파손"));
+        mockMvc.perform(get("/api/tools/changes").param("toolCode", "T-CNC04-EM"))
+                .andExpect(jsonPath("$[0].reason").value("파손"))
+                .andExpect(jsonPath("$[0].workerId").value("W2001"));
+        mockMvc.perform(post("/api/tools/{code}/change", "T-NONE").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W2001\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TOOL_NOT_FOUND"));
+    }
+
     private String receiveBar(int qty) throws Exception {
         String body = mockMvc.perform(post("/api/lots/receive").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"itemCode\":\"RM-SCM-001\",\"qty\":" + qty + ",\"supplierLotNo\":\"SUP-IT\",\"workerId\":\"W1001\"}"))

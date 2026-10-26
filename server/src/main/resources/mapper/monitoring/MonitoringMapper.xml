@@ -53,7 +53,7 @@
 
     <!-- 확인 전(ack_at IS NULL) 알람. 인덱스 ix_equipment_alarm_open (equip_code, ack_at)을 탄다 -->
     <select id="selectOpenAlarms" resultType="com.minimes.monitoring.mapper.OpenAlarm">
-        SELECT alarm_id, equip_code, alarm_type, measured_value, limit_value, occurred_at
+        SELECT alarm_id, equip_code, alarm_type, measured_value, limit_value, occurred_at, tool_code
         FROM equipment_alarm
         WHERE ack_at IS NULL
         ORDER BY occurred_at DESC

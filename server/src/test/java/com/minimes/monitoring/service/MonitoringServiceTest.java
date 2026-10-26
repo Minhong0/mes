@@ -113,8 +113,8 @@ class MonitoringServiceTest {
                 running("CNC01", "2026-10-18T09:00", "2026-10-18T10:00"),
                 running("CNC03", "2026-10-18T09:00", "2026-10-18T10:00")));
         when(monitoringMapper.selectOpenAlarms()).thenReturn(List.of(
-                new OpenAlarm(7, "CNC03", "TEMP_UCL", new BigDecimal("40.2"), new BigDecimal("39.100"), LocalDateTime.parse("2026-10-18T09:50")),
-                new OpenAlarm(5, "CNC03", "VIBRATION_UCL", new BigDecimal("2.10"), new BigDecimal("1.700"), LocalDateTime.parse("2026-10-18T09:40"))));
+                new OpenAlarm(7, "CNC03", "TEMP_UCL", new BigDecimal("40.2"), new BigDecimal("39.100"), LocalDateTime.parse("2026-10-18T09:50"), null),
+                new OpenAlarm(5, "CNC03", "VIBRATION_UCL", new BigDecimal("2.10"), new BigDecimal("1.700"), LocalDateTime.parse("2026-10-18T09:40"), null)));
 
         List<EquipmentCard> cards = service.dashboard().equipment();
 

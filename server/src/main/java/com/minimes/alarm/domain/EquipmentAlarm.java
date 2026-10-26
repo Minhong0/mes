@@ -61,6 +61,19 @@ public class EquipmentAlarm {
         return alarm;
     }
 
+    /** 공구가 수명(교체 기준 수량)에 이르렀다. measuredValue = 사용 수량, limitValue = 수명 */
+    public static EquipmentAlarm toolLifeReached(String equipCode, String toolCode, int usedCount, int lifeCount,
+                                                 LocalDateTime occurredAt) {
+        EquipmentAlarm alarm = new EquipmentAlarm();
+        alarm.equipCode = equipCode;
+        alarm.alarmType = AlarmType.TOOL_LIFE;
+        alarm.toolCode = toolCode;
+        alarm.measuredValue = BigDecimal.valueOf(usedCount);
+        alarm.limitValue = BigDecimal.valueOf(lifeCount);
+        alarm.occurredAt = occurredAt;
+        return alarm;
+    }
+
     public boolean isOpen() {
         return ackAt == null;
     }

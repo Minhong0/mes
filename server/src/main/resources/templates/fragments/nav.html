@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!-- 모든 화면 맨 위의 메뉴. active: 지금 화면 (monitoring, pareto, work-orders, trace, hold) -->
+<!-- 모든 화면 맨 위의 메뉴. active: 지금 화면 (monitoring, pareto, tools, work-orders, trace, hold) -->
 <nav th:fragment="nav(active)" class="nav-bar" aria-label="화면 메뉴">
     <a class="brand" th:href="@{/}">Mini-MES</a>
     <a th:href="@{/monitoring}" th:classappend="${active == 'monitoring'} ? 'active'"
        th:attr="aria-current=${active == 'monitoring'} ? 'page'">설비 현황</a>
     <a th:href="@{/monitoring/pareto}" th:classappend="${active == 'pareto'} ? 'active'"
        th:attr="aria-current=${active == 'pareto'} ? 'page'">정지 사유 파레토</a>
+    <a th:href="@{/tools}" th:classappend="${active == 'tools'} ? 'active'"
+       th:attr="aria-current=${active == 'tools'} ? 'page'">공구 수명</a>
     <a th:href="@{/work-orders}" th:classappend="${active == 'work-orders'} ? 'active'"
        th:attr="aria-current=${active == 'work-orders'} ? 'page'">작업지시</a>
     <a th:href="@{/lots/trace}" th:classappend="${active == 'trace'} ? 'active'"

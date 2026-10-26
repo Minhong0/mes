@@ -26,6 +26,7 @@ public enum ErrorCode {
     LOT_IN_USE(HttpStatus.CONFLICT, "이미 다음 공정에 투입된 LOT입니다."),
     LOT_ON_HOLD(HttpStatus.CONFLICT, "품질 보류 중인 LOT입니다."),
     INSPECTION_DONE(HttpStatus.CONFLICT, "이미 검사한 LOT입니다."),
+    TOOL_NOT_FOUND(HttpStatus.NOT_FOUND, "공구를 찾을 수 없습니다."),
     NOT_ALLOWED(HttpStatus.FORBIDDEN, "이 작업을 할 권한이 없습니다.");
 
     private final HttpStatus status;

@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * 관리한계(UCL) 경보.
+ * 관리한계(UCL) 경보와 공구 수명 경보.
  *
  * 메시지가 저장될 때마다 가동 중인 설비의 진동·온도를 그 설비의 UCL과 비교하고, 넘으면 equipment_alarm에 남긴다.
  * 같은 설비·종류의 열린 알람(확인 전)이 이미 있으면 새로 만들지 않는다. 확인한 뒤에도 계속 넘으면 다시 알람이 생긴다.
@@ -67,6 +67,32 @@ public class AlarmService {
         alarmRepository.save(EquipmentAlarm.limitExceeded(event.equipCode(), metric.alarmType(), value,
                 limit.get().getUcl(), event.collectedAt()));
         log.warn("[알람] {} {} {} > UCL {}", event.equipCode(), metric.alarmType(), value, limit.get().getUcl());
+    }
+
+    /**
+     * 공구 수명 알람. 공구를 설치한 뒤(installedAt보다 뒤) 이미 알람을 냈으면 다시 내지 않는다.
+     * UCL 알람과 달리 확인한 뒤에 다시 생기지 않는다: 공구는 바꾸기 전까지 계속 수명을 넘어 있으므로, 매번 다시 내면 확인할 수가 없다.
+     *
+     * @return 새로 낸 알람. 이미 냈으면 비어 있다
+     */
+    public Optional<EquipmentAlarm> raiseToolLife(String equipCode, String toolCode, int usedCount, int lifeCount,
+                                                  LocalDateTime installedAt, LocalDateTime occurredAt) {
+        if (alarmRepository.existsByToolCodeAndOccurredAtGreaterThan(toolCode, installedAt)) {
+            return Optional.empty();
+        }
+        EquipmentAlarm alarm = alarmRepository.save(
+                EquipmentAlarm.toolLifeReached(equipCode, toolCode, usedCount, lifeCount, occurredAt));
+        eventPublisher.publishEvent(new ToolAlarmRaisedEvent(alarm.getAlarmId(), equipCode, toolCode));
+        log.warn("[알람] {} 공구 {} 수명 도달 ({} / {}개)", equipCode, toolCode, usedCount, lifeCount);
+        return Optional.of(alarm);
+    }
+
+    /** 공구를 바꿨다: 그 공구의 열린 알람을 바꾼 사람이 확인한 것으로 닫는다. */
+    public void closeToolAlarms(String toolCode, String by) {
+        for (EquipmentAlarm alarm : alarmRepository.findByToolCodeAndAckAtIsNull(toolCode)) {
+            alarm.acknowledge(by, LocalDateTime.now(clock));
+            eventPublisher.publishEvent(new AlarmAcknowledgedEvent(alarm.getAlarmId(), alarm.getEquipCode()));
+        }
     }
 
     @Transactional(readOnly = true)

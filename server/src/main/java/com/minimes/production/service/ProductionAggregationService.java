@@ -5,6 +5,7 @@ import com.minimes.equipment.domain.EquipmentStatusLog;
 import com.minimes.equipment.repository.CollectedRange;
 import com.minimes.equipment.repository.EquipmentDataRepository;
 import com.minimes.equipment.repository.EquipmentStatusLogRepository;
+import com.minimes.equipment.service.ProducedCounter;
 import com.minimes.master.domain.Equipment;
 import com.minimes.master.repository.EquipmentRepository;
 import com.minimes.production.domain.ProductionDaily;
@@ -29,7 +30,7 @@ import java.util.Optional;
 /**
  * 설비 수집 데이터로 일별 생산 실적(production_daily, source = MES)을 만든다.
  *
- *   생산 수량   = 그날 메시지의 누적 카운트(cycleCount)가 늘어난 양의 합
+ *   생산 수량   = 그날 메시지의 누적 카운트(cycleCount)가 늘어난 양의 합 (ProducedCounter)
  *   계획 시간   = 그날 상태 이력이 덮는 시간 (설비 데이터가 있었던 시간)
  *   비가동 시간 = 그중 DOWN, SETUP 상태였던 시간
  *   불량 수량   = 그날 POP에서 그 설비로 등록한 불량의 합 (취소한 실적 제외). 양품 = 생산 − 불량
@@ -47,6 +48,7 @@ public class ProductionAggregationService {
     private final EquipmentStatusLogRepository statusLogRepository;
     private final ProductionDailyRepository productionDailyRepository;
     private final WorkResultRepository workResultRepository;
+    private final ProducedCounter producedCounter;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -92,7 +94,7 @@ public class ProductionAggregationService {
         if (time.plannedMin() == 0) {
             return false;   // 그날 데이터가 없다 (production_daily는 계획 시간이 0보다 커야 한다)
         }
-        int prodQty = countProduced(equipCode, from, to);
+        int prodQty = producedCounter.count(equipCode, from, to);
         int defectQty = countDefects(equipCode, from, to, prodQty);
 
         if (existing.isPresent()) {
@@ -137,33 +139,6 @@ public class ProductionAggregationService {
             }
         }
         return new TimeTotals(toMinutes(plannedSeconds), toMinutes(stoppedSeconds));
-    }
-
-    /**
-     * 그날 가공한 수량. 메시지의 누적 카운트가 늘어난 양을 더한다.
-     *
-     *   전날 마지막 30 → 31, 32, 33 → 0, 1, 2   : 1 + 1 + 1 + 0 + 1 + 1 = 5개
-     *                                ↑ 시뮬레이터 재시작 (카운트가 0부터 다시)
-     *
-     * 카운트가 줄었으면 재시작한 것이므로, 새 카운트 값(재시작 후 만든 개수)을 그대로 더한다.
-     */
-    private int countProduced(String equipCode, LocalDateTime from, LocalDateTime to) {
-        Integer previous = equipmentDataRepository.findFirstByEquipCodeAndCollectedAtLessThanOrderByCollectedAtDesc(equipCode, from)
-                .map(EquipmentData::getCycleCount)
-                .orElse(null);
-        int total = 0;
-        for (EquipmentData data : equipmentDataRepository
-                .findByEquipCodeAndCollectedAtGreaterThanEqualAndCollectedAtLessThanOrderByCollectedAt(equipCode, from, to)) {
-            Integer current = data.getCycleCount();
-            if (current == null) {
-                continue;
-            }
-            if (previous != null) {
-                total += current >= previous ? current - previous : current;
-            }
-            previous = current;
-        }
-        return total;
     }
 
     /**

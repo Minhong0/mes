@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>공구 수명 - Mini-MES</title>
+    <link rel="stylesheet" th:href="@{/css/monitoring.css}">
+    <link rel="stylesheet" th:href="@{/css/pareto.css}">
+    <link rel="stylesheet" th:href="@{/css/work-orders.css}">
+    <link rel="stylesheet" th:href="@{/css/tools.css}">
+</head>
+<body th:data-tools-url="@{/api/tools}">
+<nav th:replace="~{fragments/nav :: nav('tools')}"></nav>
+<header class="top">
+    <div>
+        <h1>공구 수명</h1>
+        <p class="sub">설비가 보낸 가공 수량으로 공구마다 사용 수량을 셉니다. 수명의 90%면 교체 임박, 수명에 이르면 설비 현황에 알람이 뜹니다. 공구를 바꾸면 [교체]를 눌러 0부터 다시 셉니다.</p>
+    </div>
+    <p class="refresh">마지막 갱신 <span id="refreshed-at">-</span> (30초마다)</p>
+</header>
+
+<p id="error" class="error" hidden></p>
+
+<section class="tiles">
+    <div class="tile"><span>공구</span><strong id="count-all">-</strong></div>
+    <div class="tile"><span>교체 임박 (90% 이상)</span><strong id="count-warn">-</strong></div>
+    <div class="tile"><span>교체 필요 (수명 도달)</span><strong id="count-replace">-</strong></div>
+</section>
+
+<!-- 교체한 사람과 사유. 표의 [교체]를 누르면 이 값으로 기록한다 -->
+<form id="change" class="panel change-form">
+    <label>사번 <input name="workerId" placeholder="예: W1001" size="8" autocomplete="off" required></label>
+    <label class="change-reason">사유
+        <input name="reason" list="reasons" maxlength="100" value="수명 도달" autocomplete="off">
+        <datalist id="reasons">
+            <option value="수명 도달"></option>
+            <option value="파손"></option>
+            <option value="품질 문제 (치수·조도)"></option>
+            <option value="품번 교체"></option>
+        </datalist>
+    </label>
+    <p id="change-result" class="form-result" hidden></p>
+</form>
+
+<section class="panel">
+    <table class="pareto-table tool-table">
+        <thead>
+        <tr><th>설비</th><th>공구</th><th>사용 / 수명</th><th class="num">남은 수량</th><th>상태</th><th>설치 <small>(공장 시계)</small></th><th></th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+    </table>
+</section>
+
+<section class="panel">
+    <h2 class="chart-title">교체 이력 <small>— 최근 것부터 50건</small></h2>
+    <table class="pareto-table">
+        <thead>
+        <tr><th>바꾼 때</th><th>공구</th><th class="num">가공 수량</th><th>사유</th><th>작업자</th></tr>
+        </thead>
+        <tbody id="history-rows"></tbody>
+    </table>
+    <p id="history-empty" class="muted" hidden>아직 바꾼 공구가 없습니다.</p>
+</section>
+
+<script th:src="@{/js/tools.js}"></script>
+</body>
+</html>
