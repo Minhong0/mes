@@ -148,4 +148,4 @@ dotnet test pop/MiniMes.Pop.Tests         # POP 화면 로직, 39개
 | `infra/` | MQTT 브로커 설정 | Mosquitto |
 | `docs/` | [ERD](docs/erd.md), [기술 결정](docs/decisions.md), 화면 캡처 | Markdown |
 
-부트캠프 원본 엑셀은 실제 거래처 이름이 들어 있어 저장소에 넣지 않았습니다. 기준정보는 CSV로 옮겨 이름을 바꿨습니다.
+부트캠프 원본 엑셀은 저작권 문제로 저장소에 넣지 않았습니다. 기준정보는 CSV로 옮겨 이름을 바꿨습니다.
