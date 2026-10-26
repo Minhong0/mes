@@ -330,9 +330,7 @@ public class LotService {
     @Transactional(readOnly = true)
     public LotDetail detail(String lotNo) {
         Lot lot = get(lotNo);
-        Map<String, String> processNames = masterQueryService.processMap().entrySet().stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getProcessName()));
-        return new LotDetail(lot, masterQueryService.getItem(lot.getItemCode()).getItemName(), processNames,
+        return new LotDetail(lot, masterQueryService.getItem(lot.getItemCode()).getItemName(), masterQueryService.processNames(),
                 historyRepository.findByLotNoOrderByEventAtAscHistoryIdAsc(lotNo));
     }
 

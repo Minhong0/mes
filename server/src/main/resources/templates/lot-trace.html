@@ -9,12 +9,12 @@
     <link rel="stylesheet" th:href="@{/css/lot-trace.css}">
 </head>
 <body th:data-lots-url="@{/api/lots}" th:data-items-url="@{/api/items}">
+<nav th:replace="~{fragments/nav :: nav('trace')}"></nav>
 <header class="top">
     <div>
         <h1>LOT 추적</h1>
         <p class="sub">이 LOT을 만든 재료(원자재까지)와 이 LOT이 들어간 곳을 함께 봅니다. LOT 번호를 누르면 그 LOT으로 다시 추적합니다. 문제 LOT은 하위 LOT까지 한꺼번에 보류할 수 있습니다.</p>
     </div>
-    <p class="refresh"><a th:href="@{/monitoring}">설비 현황</a> · <a th:href="@{/monitoring/pareto}">정지 사유 파레토</a></p>
 </header>
 
 <!-- 찾기: LOT 번호를 알면 바로, 모르면 품목을 골라 최근 LOT에서 -->

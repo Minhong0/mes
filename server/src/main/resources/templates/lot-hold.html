@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>보류 LOT - Mini-MES</title>
+    <link rel="stylesheet" th:href="@{/css/monitoring.css}">
+    <link rel="stylesheet" th:href="@{/css/pareto.css}">
+    <link rel="stylesheet" th:href="@{/css/work-orders.css}">
+    <link rel="stylesheet" th:href="@{/css/lot-hold.css}">
+</head>
+<body th:data-held-url="@{/api/lots/held}" th:data-trace-url="@{/lots/trace}">
+<nav th:replace="~{fragments/nav :: nav('hold')}"></nav>
+<header class="top">
+    <div>
+        <h1>보류 LOT</h1>
+        <p class="sub">지금 품질 보류 중이라 다음 공정에 투입할 수 없는 LOT입니다. LOT 번호를 누르면 추적 화면에서 하위 LOT을 보고 보류를 해제할 수 있습니다 (품질 담당·관리자).</p>
+    </div>
+</header>
+
+<div id="cause-filter" class="segmented" role="group" aria-label="보류 원인">
+    <button type="button" data-cause="">전체</button>
+    <button type="button" data-cause="inspection">검사 불합격</button>
+    <button type="button" data-cause="manual">직접 보류</button>
+</div>
+
+<p id="error" class="error" hidden></p>
+
+<section class="tiles">
+    <div class="tile"><span>보류 중인 LOT</span><strong id="count-all">-</strong></div>
+    <div class="tile"><span>그중 검사 불합격</span><strong id="count-inspection">-</strong></div>
+    <div class="tile"><span>원인 LOT</span><strong id="count-origin">-</strong></div>
+</section>
+
+<section class="panel">
+    <table class="pareto-table hold-table">
+        <thead>
+        <tr><th>LOT</th><th>품목</th><th class="num">남은 수량</th><th>작업지시 · 공정</th><th>보류</th><th>원인</th><th>사유</th><th>원인 LOT</th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="muted" hidden>보류 중인 LOT이 없습니다.</p>
+</section>
+
+<script th:src="@{/js/lot-hold.js}"></script>
+</body>
+</html>

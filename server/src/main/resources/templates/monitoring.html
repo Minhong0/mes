@@ -8,12 +8,13 @@
 </head>
 <!-- API 주소는 서버가 정해 data-* 속성으로 JS에 넘긴다 -->
 <body th:data-api-url="@{/api/monitoring/dashboard}" th:data-alarm-url="@{/api/alarms}" th:data-ws-path="@{/ws}">
+<nav th:replace="~{fragments/nav :: nav('monitoring')}"></nav>
 <header class="top">
     <div>
         <h1>설비 현황</h1>
         <p class="sub">CNC01~05 · 공장 시계 <strong id="factory-now">-</strong> · 오늘 <strong id="prod-date">-</strong></p>
     </div>
-    <p class="refresh"><a class="nav" th:href="@{/monitoring/pareto}">정지 사유 파레토 →</a> · <a class="nav" th:href="@{/lots/trace}">LOT 추적 →</a> · <span id="connection" class="connection">연결 중</span> · 마지막 갱신 <span id="refreshed-at">-</span></p>
+    <p class="refresh"><span id="connection" class="connection">연결 중</span> · 마지막 갱신 <span id="refreshed-at">-</span></p>
 </header>
 
 <!-- 서버에 연결할 수 없을 때만 보인다 (hidden 속성을 JS가 켜고 끈다) -->

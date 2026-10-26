@@ -9,6 +9,7 @@ import com.minimes.lot.domain.LotStatus;
 import com.minimes.lot.mapper.LotTraceMapper;
 import com.minimes.lot.mapper.TraceNode;
 import com.minimes.lot.repository.LotRepository;
+import com.minimes.lot.service.LotHoldService.HeldLot;
 import com.minimes.lot.service.LotHoldService.HoldCommand;
 import com.minimes.lot.service.LotHoldService.HoldResult;
 import com.minimes.lot.service.LotService.ReceiveCommand;
@@ -140,6 +141,32 @@ class LotHoldTest {
 
         assertThat(lotService.inputCandidates(wo.getOperations().get(0)).getFirst().lots()).isEmpty();
         assertThat(lotService.inputCandidates(wo.getOperations().get(1)).getFirst().lots()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("보류 목록: 원인 LOT과 사유를 나눠 주고(하위 LOT은 원인 LOT, 시작 LOT은 자기 자신), 검사 불합격을 가린다. 해제하면 빠진다")
+    void heldList() {
+        Lot bar = receive(10);
+        operationService.start(op10, "W1001");
+        String turned = outputOf(report(op10, 5, bar.getLotNo(), 5));
+        forward(bar.getLotNo(), turned);
+        holdService.hold(bar.getLotNo(), by(QC, true));
+        Lot other = receive(3);
+        holdService.holdByRule(other.getLotNo(), "W1001", LotHoldService.INSPECTION_FAILED + ": 외경 #2 38.07 (상한 38.05)");
+
+        List<HeldLot> held = holdService.heldLots();
+
+        assertThat(held).extracting(h -> h.lot().getLotNo(), HeldLot::originLotNo, HeldLot::reason, HeldLot::byInspection)
+                .containsExactlyInAnyOrder(
+                        tuple(bar.getLotNo(), bar.getLotNo(), "치수 불량 의심", false),
+                        tuple(turned, bar.getLotNo(), "치수 불량 의심", false),
+                        tuple(other.getLotNo(), other.getLotNo(), "검사 불합격: 외경 #2 38.07 (상한 38.05)", true));
+        assertThat(held).allSatisfy(h -> assertThat(h.heldAt()).isNotNull());
+        assertThat(held).filteredOn(h -> h.lot().getLotNo().equals(turned)).singleElement()
+                .extracting(HeldLot::heldBy).isEqualTo(QC);
+
+        holdService.release(bar.getLotNo(), new HoldCommand(QC, "재검사 합격", true));
+        assertThat(holdService.heldLots()).extracting(h -> h.lot().getLotNo()).containsExactly(other.getLotNo());
     }
 
     @Test

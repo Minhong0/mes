@@ -586,6 +586,14 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.lot.status").value("HOLD"))
                 .andExpect(jsonPath("$.history[*].eventType").value(contains("PRODUCE", "HOLD")))
                 .andExpect(jsonPath("$.history[1].note").value("검사 불합격: 외경 #2 38.06 (상한 38.05) (원인 LOT " + turned + ")"));
+
+        // 보류 목록: 원인 LOT과 사유를 나누고, 검사 불합격으로 가린다
+        mockMvc.perform(get("/api/lots/held"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.lotNo == '" + milled + "')].originLotNo").value(hasItem(turned)))
+                .andExpect(jsonPath("$[?(@.lotNo == '" + milled + "')].reason").value(hasItem("검사 불합격: 외경 #2 38.06 (상한 38.05)")))
+                .andExpect(jsonPath("$[?(@.lotNo == '" + milled + "')].processName").value(hasItem("CNC 밀링")))
+                .andExpect(jsonPath("$[?(@.lotNo == '" + turned + "')].byInspection").value(hasItem(true)));
     }
 
     private String receiveBar(int qty) throws Exception {

@@ -62,6 +62,12 @@ public class MasterQueryService {
                 .collect(Collectors.toMap(ManufacturingProcess::getProcessCode, Function.identity()));
     }
 
+    /** 공정 코드 → 공정 이름. 응답에 OP-30 대신 "열처리"를 붙일 때 쓴다. */
+    public Map<String, String> processNames() {
+        return processRepository.findAll().stream()
+                .collect(Collectors.toMap(ManufacturingProcess::getProcessCode, ManufacturingProcess::getProcessName));
+    }
+
     public List<BomNode> findBomTree(String itemCode) {
         getItem(itemCode);
         return bomMapper.selectBomTree(itemCode);

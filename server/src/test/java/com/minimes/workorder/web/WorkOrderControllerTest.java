@@ -45,6 +45,19 @@ class WorkOrderControllerTest {
     }
 
     @Test
+    @Sql({"/sql/work-order-fixture.sql", "/sql/pop-fixture.sql"})
+    @DisplayName("공정마다 공정 이름이 붙는다 (관리자 화면이 OP-10 대신 'CNC 선삭'을 보여 준다). 목록도 같다")
+    void processNames() throws Exception {
+        mockMvc.perform(post("/api/work-orders").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"itemCode\": \"FG-SFT-100\", \"planQty\": 10}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.operations[0].processName").value("CNC 선삭"))
+                .andExpect(jsonPath("$.operations[2].processName").value("열처리"));
+        mockMvc.perform(get("/api/work-orders"))
+                .andExpect(jsonPath("$[0].operations[1].processName").value("CNC 밀링"));
+    }
+
+    @Test
     @DisplayName("계획수량 0 → 400 INVALID_INPUT, 어느 필드가 틀렸는지 알려준다")
     void validationError() throws Exception {
         mockMvc.perform(post("/api/work-orders")

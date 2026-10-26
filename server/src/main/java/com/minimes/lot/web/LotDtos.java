@@ -3,6 +3,7 @@ package com.minimes.lot.web;
 import com.minimes.lot.domain.Lot;
 import com.minimes.lot.domain.LotHistory;
 import com.minimes.lot.mapper.TraceNode;
+import com.minimes.lot.service.LotHoldService.HeldLot;
 import com.minimes.lot.service.LotHoldService.HoldResult;
 import com.minimes.lot.service.LotService.InputCandidates;
 import com.minimes.lot.service.LotService.LotDetail;
@@ -44,6 +45,21 @@ public final class LotDtos {
         public static HoldResponse from(HoldResult r) {
             return new HoldResponse(r.lotNo(), r.changed().stream().map(LotResponse::from).toList(),
                     r.skipped().stream().map(LotResponse::from).toList());
+        }
+    }
+
+    /**
+     * 보류 중인 LOT 한 줄. originLotNo: 보류를 건 LOT (하위로 함께 보류됐으면 원인 LOT, 아니면 이 LOT 자신).
+     * byInspection: 검사 불합격으로 자동 보류
+     */
+    public record HeldLotResponse(String lotNo, String itemCode, String itemName, BigDecimal qty, String woNo,
+                                  String lastProcess, String processName, LocalDateTime heldAt, String heldBy,
+                                  String reason, String originLotNo, boolean byInspection) {
+        public static HeldLotResponse from(HeldLot h, Map<String, String> itemNames, Map<String, String> processNames) {
+            Lot l = h.lot();
+            return new HeldLotResponse(l.getLotNo(), l.getItemCode(), itemNames.get(l.getItemCode()), l.getQty(), l.getWoNo(),
+                    l.getLastProcess(), l.getLastProcess() == null ? null : processNames.get(l.getLastProcess()),
+                    h.heldAt(), h.heldBy(), h.reason(), h.originLotNo(), h.byInspection());
         }
     }
 

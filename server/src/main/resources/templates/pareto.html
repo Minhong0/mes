@@ -8,12 +8,12 @@
     <link rel="stylesheet" th:href="@{/css/pareto.css}">
 </head>
 <body th:data-api-url="@{/api/monitoring/downtime-pareto}">
+<nav th:replace="~{fragments/nav :: nav('pareto')}"></nav>
 <header class="top">
     <div>
         <h1>정지 사유 파레토</h1>
         <p class="sub">정지 시간이 많은 사유부터. 누적 80%까지가 중점 관리 대상입니다.</p>
     </div>
-    <p class="refresh"><a th:href="@{/monitoring}">← 설비 현황</a></p>
 </header>
 
 <!-- 조건: 바꾸면 바로 다시 조회한다 -->

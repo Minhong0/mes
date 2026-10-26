@@ -15,12 +15,31 @@
 
 * { box-sizing: border-box; }
 
+/* 모든 화면 맨 위 메뉴 (templates/fragments/nav.html). 좁은 화면에서는 줄을 바꾸지 않고 가로로 민다 */
+.nav-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: -8px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    white-space: nowrap;
+    font-size: 14px;
+}
+.nav-bar a { padding: 6px 10px; border-radius: 6px; color: var(--muted); text-decoration: none; }
+.nav-bar a:hover { background: var(--card); color: var(--text); }
+.nav-bar a.active { background: var(--card); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px var(--line); }
+.nav-bar .brand { margin-right: 8px; padding-left: 0; color: var(--text); font-weight: 700; }
+.nav-bar .brand:hover { background: none; }
+
 body {
     margin: 0;
     padding: 24px;
     background: var(--bg);
     color: var(--text);
     font-family: "Pretendard", "Malgun Gothic", system-ui, sans-serif;
+    word-break: keep-all;   /* 한글은 낱말 단위로 줄을 바꾼다 ("완제품"이 "완 / 제품"으로 갈리지 않게) */
 }
 
 .top {
@@ -114,7 +133,6 @@ body {
     cursor: pointer;
 }
 .ack:disabled { opacity: 0.5; cursor: default; }
-.nav { color: var(--accent); text-decoration: none; }
 
 .status-line { margin: 10px 0; font-size: 14px; min-height: 20px; }
 

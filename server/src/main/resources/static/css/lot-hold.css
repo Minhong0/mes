@@ -1,0 +1,15 @@
+/* 보류 LOT. 상태 고르기·작은 글씨(.code)는 work-orders.css, 표·타일은 pareto.css를 그대로 쓴다. */
+
+.hold-table { min-width: 960px; }
+.hold-table td { vertical-align: top; }
+.lot-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lot-link { color: var(--accent); font-weight: 600; text-decoration: none; }
+.lot-link:hover { text-decoration: underline; }
+.when { white-space: nowrap; }
+.reason { min-width: 200px; }
+.muted-inline { color: var(--muted); font-size: 13px; }
+
+/* 원인 배지: 검사 불합격은 빨강, 직접 보류는 주황(보류 배지와 같은 색) */
+.cause { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; }
+.cause.inspection { background: var(--down); }
+.cause.manual { background: var(--setup); }

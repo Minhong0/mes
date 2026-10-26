@@ -4,7 +4,10 @@ import com.minimes.lot.domain.LotStatus;
 import com.minimes.lot.service.LotHoldService;
 import com.minimes.lot.service.LotHoldService.HoldCommand;
 import com.minimes.lot.service.LotService;
+import com.minimes.master.domain.Item;
+import com.minimes.master.service.MasterQueryService;
 import com.minimes.lot.service.LotService.ReceiveCommand;
+import com.minimes.lot.web.LotDtos.HeldLotResponse;
 import com.minimes.lot.web.LotDtos.HoldRequest;
 import com.minimes.lot.web.LotDtos.HoldResponse;
 import com.minimes.lot.web.LotDtos.InputLotsResponse;
@@ -28,6 +31,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Tag(name = "LOT 추적", description = "원자재 입고, LOT 조회·이력, 정방향·역방향 추적, 품질 보류·해제, 공정 투입 LOT")
 @RestController
@@ -37,6 +42,7 @@ public class LotController {
 
     private final LotService lotService;
     private final LotHoldService holdService;
+    private final MasterQueryService masterQueryService;
     private final OperationService operationService;
 
     @Operation(summary = "원자재 입고", description = "LOT 관리 원자재(환봉, 키홈 핀)를 입고해 LOT을 만든다. LOT 번호: 품번-yyMMdd-001")
@@ -51,6 +57,15 @@ public class LotController {
     @GetMapping("/lots")
     public List<LotResponse> list(@RequestParam String itemCode, @RequestParam(required = false) LotStatus status) {
         return lotService.findByItem(itemCode, status).stream().map(LotResponse::from).toList();
+    }
+
+    @Operation(summary = "보류 중인 LOT", description = "지금 HOLD인 LOT과 마지막 보류(때, 누가, 사유, 원인 LOT, 검사 불합격인가). 최근에 보류한 것부터")
+    @GetMapping("/lots/held")
+    public List<HeldLotResponse> held() {
+        Map<String, String> itemNames = masterQueryService.findItems(null).stream()
+                .collect(Collectors.toMap(Item::getItemCode, Item::getItemName));
+        Map<String, String> processNames = masterQueryService.processNames();
+        return holdService.heldLots().stream().map(h -> HeldLotResponse.from(h, itemNames, processNames)).toList();
     }
 
     @Operation(summary = "LOT과 이력", description = "입고·생산·투입·취소·보류 이력을 일어난 순서대로")

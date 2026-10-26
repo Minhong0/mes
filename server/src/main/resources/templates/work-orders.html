@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>작업지시 - Mini-MES</title>
+    <link rel="stylesheet" th:href="@{/css/monitoring.css}">
+    <link rel="stylesheet" th:href="@{/css/pareto.css}">
+    <link rel="stylesheet" th:href="@{/css/work-orders.css}">
+</head>
+<body th:data-wo-url="@{/api/work-orders}" th:data-items-url="@{/api/items}">
+<nav th:replace="~{fragments/nav :: nav('work-orders')}"></nav>
+<header class="top">
+    <div>
+        <h1>작업지시</h1>
+        <p class="sub">작업지시를 만들면 라우팅의 공정이 함께 생깁니다. 현장은 POP에서 공정을 시작하고 실적을 올립니다. 모든 공정이 끝나면 완료로 바뀌고, 여기서 마감합니다.</p>
+    </div>
+</header>
+
+<!-- 새 작업지시 -->
+<form id="create" class="panel create">
+    <h2 class="chart-title">새 작업지시</h2>
+    <div class="create-fields">
+        <label>품목
+            <select name="itemCode" required>
+                <option value="">품목 선택</option>
+            </select>
+        </label>
+        <label>계획 수량 <input type="number" name="planQty" min="1" step="1" required inputmode="numeric"></label>
+        <label>납기 <input type="date" name="dueDate"></label>
+        <label class="create-note">비고 <input name="note" maxlength="200" autocomplete="off"></label>
+        <button type="submit">만들기</button>
+    </div>
+    <p id="create-result" class="form-result" hidden></p>
+</form>
+
+<!-- 상태별로 보기. 주소의 ?status=와 같다 -->
+<div id="status-filter" class="segmented" role="group" aria-label="상태">
+    <button type="button" data-status="">전체</button>
+    <button type="button" data-status="WAIT">대기</button>
+    <button type="button" data-status="RUN">진행</button>
+    <button type="button" data-status="DONE">완료</button>
+    <button type="button" data-status="CLOSED">마감</button>
+</div>
+
+<p id="error" class="error" hidden></p>
+
+<section class="tiles">
+    <div class="tile"><span>대기</span><strong id="count-wait">-</strong></div>
+    <div class="tile"><span>진행</span><strong id="count-run">-</strong></div>
+    <div class="tile"><span>완료 (마감 전)</span><strong id="count-done">-</strong></div>
+    <div class="tile"><span>납기 지남 (대기·진행)</span><strong id="count-late">-</strong></div>
+</section>
+
+<section class="panel">
+    <table class="pareto-table wo-table">
+        <thead>
+        <tr><th>작업지시</th><th>품목</th><th class="num">계획</th><th>납기</th><th>상태</th><th>공정 진행 <small>(양품)</small></th><th></th></tr>
+        </thead>
+        <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="muted" hidden>작업지시가 없습니다.</p>
+</section>
+
+<script th:src="@{/js/work-orders.js}"></script>
+</body>
+</html>

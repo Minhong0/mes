@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /** 작업지시 API의 요청·응답 형식. */
 public final class WorkOrderDtos {
@@ -25,21 +26,23 @@ public final class WorkOrderDtos {
     ) {
     }
 
+    /** processNames: 공정 코드 → 공정 이름 (MasterQueryService.processNames) */
     public record WorkOrderResponse(String woNo, String itemCode, int planQty, LocalDate dueDate, String status,
                                     LocalDateTime actualStart, LocalDateTime actualEnd, String note,
                                     LocalDateTime createdAt, List<OperationResponse> operations) {
-        public static WorkOrderResponse from(WorkOrder wo) {
+        public static WorkOrderResponse from(WorkOrder wo, Map<String, String> processNames) {
             return new WorkOrderResponse(wo.getWoNo(), wo.getItemCode(), wo.getPlanQty(), wo.getDueDate(),
                     wo.getStatus().name(), wo.getActualStart(), wo.getActualEnd(), wo.getNote(), wo.getCreatedAt(),
-                    wo.getOperations().stream().map(OperationResponse::from).toList());
+                    wo.getOperations().stream().map(op -> OperationResponse.from(op, processNames)).toList());
         }
     }
 
-    public record OperationResponse(Long woOpId, int seq, String processCode, String wcCode, String status,
-                                    int goodQty, int defectQty) {
-        public static OperationResponse from(WorkOrderOperation op) {
-            return new OperationResponse(op.getWoOpId(), op.getSeq(), op.getProcessCode(), op.getWcCode(),
-                    op.getStatus().name(), op.getGoodQty(), op.getDefectQty());
+    public record OperationResponse(Long woOpId, int seq, String processCode, String processName, String wcCode,
+                                    String status, int goodQty, int defectQty) {
+        public static OperationResponse from(WorkOrderOperation op, Map<String, String> processNames) {
+            return new OperationResponse(op.getWoOpId(), op.getSeq(), op.getProcessCode(),
+                    processNames.get(op.getProcessCode()), op.getWcCode(), op.getStatus().name(), op.getGoodQty(),
+                    op.getDefectQty());
         }
     }
 }

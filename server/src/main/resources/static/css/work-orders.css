@@ -1,0 +1,50 @@
+/* 작업지시. 색과 글꼴은 monitoring.css, 타일·표는 pareto.css를 그대로 쓴다. */
+
+.create-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 8px 16px; font-size: 14px; }
+.create-fields label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 13px; }
+.create-note { flex: 1 1 220px; }
+.create-fields input, .create-fields select, .create-fields button, .row-action, .segmented button {
+    font: inherit;
+    font-size: 14px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--text);
+}
+.create-fields input[type="number"] { width: 110px; }
+.create-fields button { border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+.create-fields button:disabled { opacity: .6; cursor: wait; }
+.form-result { margin: 10px 0 0; padding: 8px 12px; border-radius: 8px; background: var(--bg); font-size: 14px; }
+
+/* 상태 고르기: 붙어 있는 버튼 한 줄 */
+.segmented { display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 16px; }
+.segmented button { border-radius: 0; margin-left: -1px; cursor: pointer; }
+.segmented button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.segmented button:last-child { border-radius: 0 6px 6px 0; }
+.segmented button[aria-pressed="true"] { position: relative; border-color: var(--accent); background: var(--accent); color: #fff; font-weight: 600; }
+
+.wo-table { min-width: 900px; }   /* 좁은 화면에서는 칸을 짜부라뜨리지 않고 표만 가로로 스크롤 */
+.wo-table td { vertical-align: top; }
+.wo-no { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.code { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+
+.wo-status { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #fff; background: var(--idle); white-space: nowrap; }
+.wo-status.RUN { background: var(--run); }
+.wo-status.DONE { background: var(--accent); }
+.wo-status.CLOSED { background: transparent; color: var(--muted); box-shadow: inset 0 0 0 1px var(--line); }
+
+td.late { color: var(--down); font-weight: 600; white-space: nowrap; }
+.late-badge { margin-left: 6px; padding: 1px 6px; border-radius: 999px; background: #fdecec; font-size: 12px; }
+
+/* 공정 진행 칩: 완료는 옅게, 진행은 초록 테두리, 대기는 점선 */
+.ops { display: flex; flex-wrap: wrap; gap: 4px; min-width: 260px; }
+.op { display: inline-flex; gap: 4px; padding: 2px 6px; border-radius: 6px; font-size: 12px; white-space: nowrap; border: 1px solid var(--line); }
+.op-qty { font-weight: 700; font-variant-numeric: tabular-nums; }
+.op.DONE { background: var(--bg); color: var(--muted); }
+.op.RUN { border-color: var(--run); color: var(--text); box-shadow: inset 3px 0 var(--run); }
+.op.WAIT { border-style: dashed; color: var(--muted); }
+
+td.action { text-align: right; white-space: nowrap; }
+.row-action { cursor: pointer; }
+.row-action:hover { border-color: var(--accent); color: var(--accent); }

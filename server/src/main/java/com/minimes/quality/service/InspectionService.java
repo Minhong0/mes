@@ -96,7 +96,8 @@ public class InspectionService {
                 : "불합격: " + ngSummary(ng, specByCode);
         historyRepository.save(LotHistory.of(lotNo, LotEventType.INSPECT, lot.getQty(), lot.getLastProcess(), null,
                 command.workerId(), null, note, now));
-        HoldResult hold = ng.isEmpty() ? null : holdService.holdByRule(lotNo, command.workerId(), cut("검사 " + note));
+        HoldResult hold = ng.isEmpty() ? null
+                : holdService.holdByRule(lotNo, command.workerId(), cut(LotHoldService.INSPECTION_FAILED + ": " + ngSummary(ng, specByCode)));
         return sheetOf(lot, specs, hold);
     }
 

@@ -29,7 +29,7 @@
 
 .tiles {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
     gap: 16px;
     margin-bottom: 16px;
 }
@@ -62,3 +62,8 @@
 .pareto-table td.num, .pareto-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .pareto-table tr.vital td:first-child { box-shadow: inset 3px 0 var(--vital); }
 .panel:has(.pareto-table) { overflow-x: auto; }   /* 좁은 화면에서는 표만 가로로 스크롤 */
+
+/* 첫 화면의 링크 타일: 큰 숫자 대신 설명 한 줄 */
+a.tile { color: inherit; text-decoration: none; }
+a.tile:hover { border-color: var(--accent); }
+a.tile strong { font-size: 15px; font-weight: 500; }

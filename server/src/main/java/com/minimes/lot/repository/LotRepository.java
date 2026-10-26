@@ -32,6 +32,8 @@ public interface LotRepository extends JpaRepository<Lot, String> {
     List<Lot> findByItemCodeAndStatusAndWoNoAndLastProcessOrderByCreatedAtAscLotNoAsc(
             String itemCode, LotStatus status, String woNo, String lastProcess);
 
+    List<Lot> findByStatus(LotStatus status);
+
     /** 품목의 LOT 목록 (최근 것부터) */
     List<Lot> findTop100ByItemCodeOrderByCreatedAtDescLotNoDesc(String itemCode);
 

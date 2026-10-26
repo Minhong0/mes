@@ -16,6 +16,30 @@ Java 21, Spring Boot 4.0, JPA + MyBatis, MSSQL.
 3. http://localhost:8080/swagger-ui.html 에서 API를 확인하고 직접 호출해 볼 수 있습니다.
 4. 설비 시뮬레이터(`simulator/MiniMes.Simulator`에서 `dotnet run`)를 실행하면, 서버의 MQTT 수집기가 메시지를 받아 `equipment_data`에 저장합니다.
 
+## 관리자 화면
+
+모든 화면 맨 위에 같은 메뉴(설비 현황, 정지 사유 파레토, 작업지시, LOT 추적, 보류 LOT)가 있습니다. 메뉴는 `templates/fragments/nav.html` 하나이고, 각 화면이 `th:replace`로 넣습니다. http://localhost:8080/ 은 화면 목록입니다.
+
+### 작업지시
+
+http://localhost:8080/work-orders
+
+- **새 작업지시**: 품목(완제품), 계획 수량, 납기, 비고를 넣고 [만들기]. 라우팅의 공정이 함께 생깁니다 (`POST /api/work-orders`).
+- **목록**: 대기·진행·완료·마감으로 거를 수 있고, 주소(`?status=RUN`)에도 남습니다.
+  - 공정마다 칩 하나에 공정 이름과 양품 수량이 나옵니다 (완료는 옅게, 진행은 초록, 대기는 점선).
+  - 납기가 지났는데 대기·진행이면 "지연"으로 표시합니다.
+- **버튼**: 대기면 [시작], 완료면 [마감]. 완료는 모든 공정이 끝나면 서버가 바꾸므로 버튼이 없습니다.
+- 목록은 한 번에 모두 읽고 화면에서 거릅니다. 위의 숫자(대기, 진행, 완료, 납기 지남)는 늘 전체 기준입니다.
+
+### 보류 LOT
+
+http://localhost:8080/lots/hold
+
+- 지금 HOLD인 LOT과 마지막 보류(때, 누가, 사유, 원인 LOT)를 최근 것부터 보여 줍니다 (`GET /api/lots/held`).
+- 원인은 "검사 불합격"(검사 NG로 자동 보류)과 "직접 보류"(추적 화면에서 품질 담당이 보류)로 거를 수 있습니다 (`?cause=inspection`).
+- 하위 LOT으로 함께 보류된 LOT은 원인 LOT이 따로 나옵니다. LOT 번호를 누르면 추적 화면으로 가서 해제합니다.
+- 원인 LOT과 검사 불합격 여부는 `lot_history`의 보류 메모("사유 (원인 LOT X)", "검사 불합격: ...")에서 읽습니다. 메모 형식은 `LotHoldService` 한 곳에서 만들고 읽습니다.
+
 ## 모니터링 화면
 
 http://localhost:8080/monitoring 에서 CNC01~05의 현재 상태, 진행 중인 정지 사유, 마지막 센서값, 오늘 OEE를 실시간으로 보여 줍니다.
@@ -171,13 +195,13 @@ com.minimes
 │  ├─ repository
 │  ├─ mapper      WorkListMapper (작업장의 작업 목록 + 앞 공정 양품) → resources/mapper/workorder/
 │  ├─ service     WorkOrderService, OperationService (시작·실적·완료·취소, requestId 중복 방지)
-│  └─ web         WorkOrderController, OperationController (POP API)
+│  └─ web         WorkOrderController, OperationController (POP API), WorkOrderPageController (/work-orders 화면)
 ├─ lot            LOT 입고, 실적의 투입·산출, 취소 되돌리기, 추적, 품질 보류
 │  ├─ domain      Lot(남은 수량, 상태 규칙), LotGenealogy(투입 → 산출), LotHistory(이력), LotStatus, LotEventType
 │  ├─ repository  LotRepository (투입 LOT 잠금 조회 포함)
 │  ├─ mapper      LotTraceMapper (정방향·역방향 재귀 CTE) → resources/mapper/lot/LotTraceMapper.xml
 │  ├─ service     LotService (공정에 투입할 품목, 투입 확인, 기록, 취소), LotHoldService (보류·해제)
-│  └─ web         LotController (/api/lots, 보류·해제, 공정 투입 LOT), LotPageController (/lots/trace 화면)
+│  └─ web         LotController (/api/lots, 보류·해제, 공정 투입 LOT), LotPageController (/lots/trace, /lots/hold 화면)
 ├─ quality        검사 결과와 판정, 불합격 자동 보류
 │  ├─ domain      InspectionResult(시료 하나의 측정값과 판정), Judgement
 │  ├─ repository
@@ -219,7 +243,7 @@ com.minimes
 | GET | `/api/equipment` | 설비 목록 |
 | GET | `/api/common-codes/{groupCode}` | 공통코드 |
 | POST | `/api/work-orders` | 작업지시 생성 |
-| GET | `/api/work-orders?status=RUN` | 작업지시 목록 |
+| GET | `/api/work-orders?status=RUN` | 작업지시 목록 (공정마다 `processName` 포함) |
 | GET | `/api/work-orders/{woNo}` | 작업지시 단건 |
 | POST | `/api/work-orders/{woNo}/start` | 시작 (대기 → 진행) |
 | POST | `/api/work-orders/{woNo}/complete` | 완료 (진행 → 완료) |
@@ -236,6 +260,7 @@ com.minimes
 | PUT | `/api/downtimes/{downtimeId}/reason` | 정지 사유 확정 (`{"workerId":"W1001","dtCat":"MATERIAL","dtSub":"MAT_NOT_RECEIVED","note":"..."}`) |
 | POST | `/api/lots/receive` | 원자재 입고 (`{"itemCode":"RM-SCM-001","qty":100,"supplierLotNo":"A-1018","workerId":"W1001"}`) |
 | GET | `/api/lots?itemCode=RM-SCM-001&status=ACTIVE` | 품목의 LOT 목록 (최근 100개) |
+| GET | `/api/lots/held` | 보류 중인 LOT과 마지막 보류 (사유, 원인 LOT, 검사 불합격인가) |
 | GET | `/api/lots/{lotNo}` | LOT과 이력 (공정 이름 포함) |
 | GET | `/api/lots/{lotNo}/trace` | 역방향(`backward`)·정방향(`forward`) 추적 |
 | POST | `/api/lots/{lotNo}/hold` | 품질 보류 (`{"workerId":"W6001","reason":"...","includeDownstream":true}`). QC·ADMIN만 |

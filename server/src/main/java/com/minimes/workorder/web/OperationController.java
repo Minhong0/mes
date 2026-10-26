@@ -1,6 +1,7 @@
 package com.minimes.workorder.web;
 
 import com.minimes.lot.service.LotService;
+import com.minimes.master.service.MasterQueryService;
 import com.minimes.lot.service.ResultLots;
 import com.minimes.workorder.domain.WorkResult;
 import com.minimes.workorder.mapper.OperationItem;
@@ -36,6 +37,7 @@ public class OperationController {
 
     private final OperationService operationService;
     private final LotService lotService;
+    private final MasterQueryService masterQueryService;
 
     @Operation(summary = "작업장의 작업 목록", description = "대기·진행 중인 공정. 진행 중인 것이 먼저, 그다음 납기 순")
     @GetMapping("/work-centers/{wcCode}/operations")
@@ -46,7 +48,7 @@ public class OperationController {
     @Operation(summary = "공정 시작 (대기 → 진행)", description = "작업지시가 대기면 함께 진행으로 바뀐다")
     @PostMapping("/operations/{woOpId}/start")
     public OperationResponse start(@PathVariable long woOpId, @Valid @RequestBody WorkerRequest req) {
-        return OperationResponse.from(operationService.start(woOpId, req.workerId()));
+        return OperationResponse.from(operationService.start(woOpId, req.workerId()), masterQueryService.processNames());
     }
 
     @Operation(summary = "실적 등록", description = "양품 수량, 불량 내역, 투입 LOT. 양품으로 산출 LOT을 만든다. "
@@ -69,7 +71,7 @@ public class OperationController {
     @Operation(summary = "공정 완료 (진행 → 완료)", description = "마지막 공정까지 끝나면 작업지시도 완료된다")
     @PostMapping("/operations/{woOpId}/complete")
     public OperationResponse complete(@PathVariable long woOpId, @Valid @RequestBody WorkerRequest req) {
-        return OperationResponse.from(operationService.complete(woOpId, req.workerId()));
+        return OperationResponse.from(operationService.complete(woOpId, req.workerId()), masterQueryService.processNames());
     }
 
     @Operation(summary = "실적 취소", description = "행을 지우지 않고 취소 표시. 공정 합계에서 빠진다. 마감한 작업지시는 불가")

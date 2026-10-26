@@ -2,16 +2,27 @@
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Mini-MES</title>
+    <link rel="stylesheet" th:href="@{/css/monitoring.css}">
+    <link rel="stylesheet" th:href="@{/css/pareto.css}">
 </head>
 <body>
-<h1>Mini-MES</h1>
-<p>관리자 웹 (작성 중)</p>
-<ul>
-    <li><a th:href="@{/monitoring}">설비 현황 (모니터링)</a></li>
-    <li><a th:href="@{/monitoring/pareto}">정지 사유 파레토</a></li>
-    <li><a th:href="@{/lots/trace}">LOT 추적</a></li>
-    <li><a th:href="@{/swagger-ui.html}">API 문서 (Swagger)</a></li>
-</ul>
+<nav th:replace="~{fragments/nav :: nav('')}"></nav>
+<header class="top">
+    <div>
+        <h1>Mini-MES</h1>
+        <p class="sub">CNC 샤프트 가공 공장의 관리자 웹입니다. 현장 입력(공정 시작, 실적, 정지 사유, 검사)은 POP에서 합니다.</p>
+    </div>
+</header>
+
+<section class="tiles">
+    <a class="tile" th:href="@{/monitoring}"><span>설비 현황</span><strong>CNC01~05 상태, 알람, 오늘 OEE</strong></a>
+    <a class="tile" th:href="@{/monitoring/pareto}"><span>정지 사유 파레토</span><strong>정지 시간이 많은 사유부터</strong></a>
+    <a class="tile" th:href="@{/work-orders}"><span>작업지시</span><strong>만들기, 공정 진행, 마감</strong></a>
+    <a class="tile" th:href="@{/lots/trace}"><span>LOT 추적</span><strong>원자재까지 역방향, 완제품까지 정방향</strong></a>
+    <a class="tile" th:href="@{/lots/hold}"><span>보류 LOT</span><strong>검사 불합격과 직접 보류</strong></a>
+    <a class="tile" th:href="@{/swagger-ui.html}"><span>API 문서</span><strong>Swagger</strong></a>
+</section>
 </body>
 </html>
