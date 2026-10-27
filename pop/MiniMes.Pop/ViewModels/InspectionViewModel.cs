@@ -19,14 +19,12 @@ public partial class InspectionViewModel : ObservableObject
     public const int MaxSamples = 10;
 
     private readonly IMesApi _api;
-    private readonly Worker _worker;
     private readonly Action<string, bool> _showMessage;   // (메시지, 오류인가): 작업 화면 아래 메시지 줄에 띄운다
     private int _loadVersion;
 
-    public InspectionViewModel(IMesApi api, Worker worker, Action<string, bool> showMessage)
+    public InspectionViewModel(IMesApi api, Action<string, bool> showMessage)
     {
         _api = api;
-        _worker = worker;
         _showMessage = showMessage;
     }
 
@@ -125,7 +123,7 @@ public partial class InspectionViewModel : ObservableObject
     private async Task SaveAsync()
     {
         var lotNo = Sheet!.LotNo;
-        var request = new InspectRequest(_worker.WorkerId, Rows
+        var request = new InspectRequest(Rows
             .SelectMany(r => r.Cells.Select(c => new Measurement(r.Item.InspectCode, c.SampleNo, c.Value!.Value)))
             .ToList());
         IsBusy = true;

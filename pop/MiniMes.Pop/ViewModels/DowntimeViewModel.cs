@@ -16,15 +16,13 @@ public partial class DowntimeViewModel : ObservableObject
     public const int RecentCount = 10;
 
     private readonly IMesApi _api;
-    private readonly Worker _worker;
     private readonly Action<string, bool> _showMessage;   // (메시지, 오류인가): 작업 화면 아래 메시지 줄에 띄운다
     private IReadOnlyList<CommonCode> _allSubs = [];
     private int _loadVersion;
 
-    public DowntimeViewModel(IMesApi api, Worker worker, Action<string, bool> showMessage)
+    public DowntimeViewModel(IMesApi api, Action<string, bool> showMessage)
     {
         _api = api;
-        _worker = worker;
         _showMessage = showMessage;
     }
 
@@ -137,7 +135,7 @@ public partial class DowntimeViewModel : ObservableObject
     private async Task SaveReasonAsync()
     {
         var row = SelectedDowntime!;
-        var request = new ReasonRequest(_worker.WorkerId, SelectedCategory!.Code, SelectedSubReason?.Code,
+        var request = new ReasonRequest(SelectedCategory!.Code, SelectedSubReason?.Code,
             string.IsNullOrWhiteSpace(Note) ? null : Note.Trim());
         IsBusy = true;
         try

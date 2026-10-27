@@ -1,10 +1,16 @@
+using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 
 namespace MiniMes.Pop.Api;
 
-/// <summary>서버 REST API를 HttpClient로 부른다.</summary>
+/// <summary>
+/// 서버 REST API를 HttpClient로 부른다.
+/// 로그인으로 받은 토큰을 Authorization: Bearer 헤더로 붙인다 (쿠키는 쓰지 않는다: 쿠키는 관리자 웹용).
+/// 로그인 뒤 401이 오면 토큰이 만료된 것이라 SessionExpired를 알린다.
+/// </summary>
 public sealed class MesApiClient : IMesApi
 {
     // Web 기본값: 필드 이름 camelCase, 대소문자 구분 없이 읽기. 서버(Spring + Jackson) JSON과 맞는다.
@@ -12,13 +18,23 @@ public sealed class MesApiClient : IMesApi
 
     private readonly HttpClient _http;
 
+    public event EventHandler? SessionExpired;
+
     public MesApiClient(Uri baseAddress, TimeSpan timeout)
     {
-        _http = new HttpClient { BaseAddress = baseAddress, Timeout = timeout };
+        // UseCookies = false: 서버가 관리자 웹용으로 심는 쿠키를 받아 두지 않는다. POP는 헤더만 쓴다
+        _http = new HttpClient(new HttpClientHandler { UseCookies = false }) { BaseAddress = baseAddress, Timeout = timeout };
     }
 
-    public Task<Worker> GetWorkerAsync(string workerId) =>
-        GetAsync<Worker>($"api/workers/{Uri.EscapeDataString(workerId)}");
+    public async Task<Worker> LoginAsync(string workerId, string password)
+    {
+        Logout();
+        var login = await PostAsync<LoginResponse>("api/auth/login", new { workerId, password });
+        _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login.AccessToken);
+        return login.Worker;
+    }
+
+    public void Logout() => _http.DefaultRequestHeaders.Authorization = null;
 
     public Task<IReadOnlyList<Equipment>> GetEquipmentAsync() =>
         GetAsync<IReadOnlyList<Equipment>>("api/equipment");
@@ -29,8 +45,8 @@ public sealed class MesApiClient : IMesApi
     public Task<IReadOnlyList<OperationItem>> GetOpenOperationsAsync(string wcCode) =>
         GetAsync<IReadOnlyList<OperationItem>>($"api/work-centers/{wcCode}/operations");
 
-    public Task<OperationState> StartAsync(long woOpId, string workerId) =>
-        PostAsync<OperationState>($"api/operations/{woOpId}/start", new { workerId });
+    public Task<OperationState> StartAsync(long woOpId) =>
+        PostAsync<OperationState>($"api/operations/{woOpId}/start", new { });
 
     public Task<IReadOnlyList<InputLots>> GetInputLotsAsync(long woOpId) =>
         GetAsync<IReadOnlyList<InputLots>>($"api/operations/{woOpId}/input-lots");
@@ -38,14 +54,14 @@ public sealed class MesApiClient : IMesApi
     public Task<WorkResult> ReportAsync(long woOpId, ReportRequest request) =>
         PostAsync<WorkResult>($"api/operations/{woOpId}/results", request);
 
-    public Task<OperationState> CompleteAsync(long woOpId, string workerId) =>
-        PostAsync<OperationState>($"api/operations/{woOpId}/complete", new { workerId });
+    public Task<OperationState> CompleteAsync(long woOpId) =>
+        PostAsync<OperationState>($"api/operations/{woOpId}/complete", new { });
 
     public Task<IReadOnlyList<WorkResult>> GetResultsAsync(long woOpId) =>
         GetAsync<IReadOnlyList<WorkResult>>($"api/operations/{woOpId}/results");
 
-    public Task<WorkResult> CancelResultAsync(long resultId, string workerId, string reason) =>
-        PostAsync<WorkResult>($"api/results/{resultId}/cancel", new { workerId, reason });
+    public Task<WorkResult> CancelResultAsync(long resultId, string reason) =>
+        PostAsync<WorkResult>($"api/results/{resultId}/cancel", new { reason });
 
     public Task<InspectionSheet> GetInspectionAsync(string lotNo) =>
         GetAsync<InspectionSheet>($"api/lots/{Uri.EscapeDataString(lotNo)}/inspection");
@@ -63,7 +79,7 @@ public sealed class MesApiClient : IMesApi
 
     private Task<T> PostAsync<T>(string path, object body) => SendAsync<T>(() => _http.PostAsJsonAsync(path, body, Json));
 
-    private static async Task<T> SendAsync<T>(Func<Task<HttpResponseMessage>> send)
+    private async Task<T> SendAsync<T>(Func<Task<HttpResponseMessage>> send)
     {
         HttpResponseMessage response;
         try
@@ -84,6 +100,12 @@ public sealed class MesApiClient : IMesApi
             if (!response.IsSuccessStatusCode)
             {
                 var error = await ReadErrorAsync(response);
+                // 토큰을 들고 보냈는데 401: 만료됐다 (로그인 실패의 401은 토큰 없이 보낸 것이라 여기 오지 않는다)
+                if (response.StatusCode == HttpStatusCode.Unauthorized && _http.DefaultRequestHeaders.Authorization != null)
+                {
+                    Logout();
+                    SessionExpired?.Invoke(this, EventArgs.Empty);
+                }
                 throw new MesApiException((int)response.StatusCode, error.Code, error.Message);
             }
             return (await response.Content.ReadFromJsonAsync<T>(Json))!;

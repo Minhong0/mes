@@ -5,6 +5,9 @@ namespace MiniMes.Pop.Api;
 
 public sealed record Worker(string WorkerId, string WorkerName, string? WcCode, string Role);
 
+/// <summary>로그인 응답. AccessToken은 요청마다 Authorization: Bearer로 보낸다 (MesApiClient가 붙인다)</summary>
+public sealed record LoginResponse(string AccessToken, string TokenType, DateTimeOffset ExpiresAt, Worker Worker);
+
 public sealed record Equipment(string EquipCode, string EquipName, string? WcCode, bool AutoCollect);
 
 public sealed record CommonCode(string Code, string CodeName, string? ParentCode);
@@ -38,9 +41,10 @@ public sealed record LotInput(string LotNo, decimal Qty);
 
 /// <summary>
 /// 실적 등록 요청. RequestId: 다시 보내도 한 번만 저장되도록 POP가 만든 GUID.
-/// Inputs: 투입한 LOT. 품목마다 합이 (양품 + 불량) × 1개당 투입 수량이어야 한다
+/// Inputs: 투입한 LOT. 품목마다 합이 (양품 + 불량) × 1개당 투입 수량이어야 한다.
+/// 누가 했는지는 보내지 않는다: 서버가 로그인 토큰의 사번으로 남긴다
 /// </summary>
-public sealed record ReportRequest(string RequestId, string WorkerId, string? EquipCode, int GoodQty, IReadOnlyList<DefectLine> Defects,
+public sealed record ReportRequest(string RequestId, string? EquipCode, int GoodQty, IReadOnlyList<DefectLine> Defects,
     IReadOnlyList<LotInput> Inputs);
 
 public sealed record WorkResult(
@@ -84,7 +88,7 @@ public sealed record Downtime(
     DateTime? ReasonAt);
 
 /// <summary>정지 사유 확정 요청. DtSub, Note는 비워도 된다</summary>
-public sealed record ReasonRequest(string WorkerId, string DtCat, string? DtSub, string? Note);
+public sealed record ReasonRequest(string DtCat, string? DtSub, string? Note);
 
 /// <summary>
 /// LOT 검사표: 그 LOT을 만든 공정의 검사 항목과, 검사했으면 시료별 측정값.
@@ -117,7 +121,7 @@ public sealed record InspectionItem(
 public sealed record InspectionSample(int SampleNo, decimal Value, string Judgement);
 
 /// <summary>검사 등록 요청. 모든 항목을 시료 1번부터 n번까지</summary>
-public sealed record InspectRequest(string WorkerId, IReadOnlyList<Measurement> Measurements);
+public sealed record InspectRequest(IReadOnlyList<Measurement> Measurements);
 
 public sealed record Measurement(string InspectCode, int SampleNo, decimal Value);
 

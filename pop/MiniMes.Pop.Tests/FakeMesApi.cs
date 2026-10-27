@@ -26,9 +26,29 @@ public sealed class FakeMesApi : IMesApi
         new(11, "WO-1", 10, "OP-10", "CNC 선삭", "WC-100", status, good, defect, null,
             "FG-SFT-100", "샤프트", 100, null, "RUN", null);
 
-    public Task<Worker> GetWorkerAsync(string workerId) => workerId == "W1001"
-        ? Task.FromResult(new Worker("W1001", "김도윤", "WC-100", "OPERATOR"))
-        : Task.FromException<Worker>(new MesApiException(404, "WORKER_NOT_FOUND", $"작업자를 찾을 수 없습니다: {workerId}"));
+    /// <summary>로그인한 사번. 서버처럼 실적·사유·검사에 이 사번이 남는다</summary>
+    public string? LoggedIn { get; private set; } = "W1001";
+
+    public event EventHandler? SessionExpired;
+
+    public Task<Worker> LoginAsync(string workerId, string password)
+    {
+        if (workerId != "W1001" || password != "1234")
+        {
+            return Task.FromException<Worker>(new MesApiException(401, "LOGIN_FAILED", "사번 또는 비밀번호가 맞지 않습니다."));
+        }
+        LoggedIn = workerId;
+        return Task.FromResult(new Worker("W1001", "김도윤", "WC-100", "OPERATOR"));
+    }
+
+    public void Logout() => LoggedIn = null;
+
+    /// <summary>서버가 401(토큰 만료)을 돌려준 것처럼 한다</summary>
+    public void ExpireSession()
+    {
+        LoggedIn = null;
+        SessionExpired?.Invoke(this, EventArgs.Empty);
+    }
 
     public Task<IReadOnlyList<Equipment>> GetEquipmentAsync() => Task.FromResult<IReadOnlyList<Equipment>>(
     [
@@ -53,7 +73,7 @@ public sealed class FakeMesApi : IMesApi
         Task.FromResult<IReadOnlyList<OperationItem>>(
             wcCode == "WC-100" && Operation.Status is "WAIT" or "RUN" ? [Operation] : []);   // 서버처럼 끝난 공정은 빼고
 
-    public Task<OperationState> StartAsync(long woOpId, string workerId)
+    public Task<OperationState> StartAsync(long woOpId)
     {
         Operation = Operation with { Status = "RUN" };
         return Task.FromResult(new OperationState(woOpId, 10, "OP-10", "WC-100", "RUN", 0, 0));
@@ -85,6 +105,10 @@ public sealed class FakeMesApi : IMesApi
             }
             return Task.FromException<WorkResult>(new MesConnectionException("서버 응답이 없습니다.", new TimeoutException()));
         }
+        if (LoggedIn == null)
+        {
+            return Task.FromException<WorkResult>(new MesApiException(401, "UNAUTHORIZED", "로그인이 만료되었습니다. 다시 로그인하세요."));
+        }
         var held = request.Inputs.FirstOrDefault(i => HeldLots.Contains(i.LotNo));
         if (held != null)
         {
@@ -108,7 +132,7 @@ public sealed class FakeMesApi : IMesApi
             return existing;
         }
         var defects = request.Defects.Sum(d => d.Qty);
-        var result = new WorkResult(Saved.Count + 1, 11, request.EquipCode, request.WorkerId, DateTime.Today, DateTime.Now,
+        var result = new WorkResult(Saved.Count + 1, 11, request.EquipCode, LoggedIn, DateTime.Today, DateTime.Now,
             request.GoodQty, defects, false, null, request.Defects,
             OutputLots(request.GoodQty), request.Inputs);
         Saved.Add(result);
@@ -132,7 +156,7 @@ public sealed class FakeMesApi : IMesApi
         return lots;
     }
 
-    public Task<OperationState> CompleteAsync(long woOpId, string workerId)
+    public Task<OperationState> CompleteAsync(long woOpId)
     {
         Operation = Operation with { Status = "DONE" };
         return Task.FromResult(new OperationState(woOpId, 10, "OP-10", "WC-100", "DONE", Operation.GoodQty, Operation.DefectQty));
@@ -140,7 +164,7 @@ public sealed class FakeMesApi : IMesApi
 
     public Task<IReadOnlyList<WorkResult>> GetResultsAsync(long woOpId) => Task.FromResult<IReadOnlyList<WorkResult>>(Saved.ToList());
 
-    public Task<WorkResult> CancelResultAsync(long resultId, string workerId, string reason) =>
+    public Task<WorkResult> CancelResultAsync(long resultId, string reason) =>
         throw new NotSupportedException();
 
     /// <summary>선삭 검사 항목: 외경 37.95~38.05 mm, 표면 거칠기 3.2 um 이하</summary>
@@ -186,7 +210,7 @@ public sealed class FakeMesApi : IMesApi
             Status = ng ? "HOLD" : sheet.Status,
             Judgement = ng ? "NG" : "OK",
             SampleCount = request.Measurements.Max(m => m.SampleNo),
-            WorkerId = request.WorkerId,
+            WorkerId = LoggedIn,
             MeasuredAt = new DateTime(2026, 10, 22, 14, 5, 0),
             Items = items,
             HeldLotNos = ng ? [lotNo] : [],
@@ -221,7 +245,7 @@ public sealed class FakeMesApi : IMesApi
         var index = Downtimes.FindIndex(d => d.DowntimeId == downtimeId);
         Downtimes[index] = Downtimes[index] with
         {
-            DtCat = request.DtCat, DtSub = request.DtSub, Note = request.Note, WorkerId = request.WorkerId, ReasonAt = DateTime.Now,
+            DtCat = request.DtCat, DtSub = request.DtSub, Note = request.Note, WorkerId = LoggedIn, ReasonAt = DateTime.Now,
         };
         return Task.FromResult(Downtimes[index]);
     }

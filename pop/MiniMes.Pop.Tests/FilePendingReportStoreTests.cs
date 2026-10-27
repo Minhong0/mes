@@ -17,7 +17,7 @@ public sealed class FilePendingReportStoreTests : IDisposable
     }
 
     private static SavedReport Sample(string workerId = "W1001") => new(workerId, "WC-100", 11, "WO-1", "CNC 선삭",
-        new ReportRequest("req-1", workerId, "CNC01", 5, [new DefectLine("OVERSIZE", 2)], [new LotInput("RM-SCM-001-261017-001", 7)]), new DateTime(2026, 10, 17, 9, 0, 0));
+        new ReportRequest("req-1", "CNC01", 5, [new DefectLine("OVERSIZE", 2)], [new LotInput("RM-SCM-001-261017-001", 7)]), new DateTime(2026, 10, 17, 9, 0, 0));
 
     [Fact(DisplayName = "적은 것을 그대로 읽고(불량 내역, 투입 LOT 포함), 지우면 없다. 작업자마다 따로 보관한다")]
     public void RoundTrip()

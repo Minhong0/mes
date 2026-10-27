@@ -38,8 +38,8 @@ public partial class WorkViewModel : ObservableObject
         _pendingStore = pendingStore;
         _logout = logout;
         Worker = worker;
-        Downtime = new DowntimeViewModel(api, worker, ShowMessage);
-        Inspection = new InspectionViewModel(api, worker, ShowMessage);
+        Downtime = new DowntimeViewModel(api, ShowMessage);
+        Inspection = new InspectionViewModel(api, ShowMessage);
     }
 
     public Worker Worker { get; }
@@ -237,7 +237,7 @@ public partial class WorkViewModel : ObservableObject
         var op = SelectedOperation!;
         await RunAsync(async () =>
         {
-            await _api.StartAsync(op.WoOpId, Worker.WorkerId);
+            await _api.StartAsync(op.WoOpId);
             ShowInfo($"{op.WoNo} {op.ProcessName} 작업을 시작했습니다.");
             await RefreshAsync();
         });
@@ -260,7 +260,6 @@ public partial class WorkViewModel : ObservableObject
         var op = SelectedOperation!;
         var request = new ReportRequest(
             Guid.NewGuid().ToString(),
-            Worker.WorkerId,
             SelectedEquipment?.EquipCode,
             GoodQty,
             Defects.Where(d => d.Qty > 0).Select(d => new DefectLine(d.Code, d.Qty)).ToList(),
@@ -292,6 +291,12 @@ public partial class WorkViewModel : ObservableObject
         {
             PendingReport = request;   // 저장됐는지 모른다: 같은 요청을 다시 보내게 잡아 둔다
             ShowError($"{e.Message} [다시 보내기]를 누르세요. 같은 요청이라 두 번 저장되지 않습니다.");
+        }
+        catch (MesApiException e) when (e.StatusCode == 401)
+        {
+            // 로그인 만료: 저장되지 않았다. 단말 파일은 남겨 두고, 다시 로그인하면 작업 화면이 뜨면서 다시 보낸다
+            PendingReport = request;
+            ShowError(e.Message);
         }
         catch (MesApiException e)
         {
@@ -344,7 +349,7 @@ public partial class WorkViewModel : ObservableObject
         }
         await RunAsync(async () =>
         {
-            await _api.CompleteAsync(op.WoOpId, Worker.WorkerId);
+            await _api.CompleteAsync(op.WoOpId);
             ShowInfo($"{op.WoNo} {op.ProcessName} 공정을 완료했습니다.");
             await RefreshAsync();
         });
@@ -364,7 +369,7 @@ public partial class WorkViewModel : ObservableObject
         }
         await RunAsync(async () =>
         {
-            await _api.CancelResultAsync(result.ResultId, Worker.WorkerId, reason.Trim());
+            await _api.CancelResultAsync(result.ResultId, reason.Trim());
             ShowInfo($"실적 #{result.ResultId}을 취소했습니다.");
             await RefreshAsync();
         });

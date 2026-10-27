@@ -5,17 +5,22 @@
         <Border Style="{StaticResource Panel}" Width="440" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="32">
             <StackPanel>
                 <TextBlock Text="Mini-MES POP" FontSize="28" FontWeight="Bold" />
-                <TextBlock Text="사번을 입력하거나 사원증 바코드를 찍으세요." Style="{StaticResource MutedText}" Margin="0,6,0,20" />
+                <TextBlock Text="사원증 바코드를 찍거나 사번을 입력하고, 비밀번호를 넣으세요." Style="{StaticResource MutedText}" Margin="0,6,0,20" TextWrapping="Wrap" />
                 <!-- UpdateSourceTrigger=PropertyChanged: 글자를 칠 때마다 ViewModel에 넣어 [로그인] 버튼이 바로 켜지게 한다 -->
-                <TextBox x:Name="WorkerIdBox" Text="{Binding WorkerId, UpdateSourceTrigger=PropertyChanged}" FontSize="26">
-                    <TextBox.InputBindings>
-                        <!-- 바코드 스캐너는 글자 뒤에 Enter를 보낸다 -->
+                <TextBlock Text="사번" Style="{StaticResource MutedText}" Margin="4,0,4,4" />
+                <!-- 바코드 스캐너는 글자 뒤에 Enter를 보낸다: 사번 칸에서 Enter면 비밀번호 칸으로 (LoginView.xaml.cs) -->
+                <TextBox x:Name="WorkerIdBox" Text="{Binding WorkerId, UpdateSourceTrigger=PropertyChanged}" FontSize="26"
+                         AutomationProperties.Name="사번" KeyDown="WorkerIdBox_KeyDown" />
+                <TextBlock Text="비밀번호" Style="{StaticResource MutedText}" Margin="4,12,4,4" />
+                <PasswordBox x:Name="PasswordBox" FontSize="26" AutomationProperties.Name="비밀번호"
+                             PasswordChanged="PasswordBox_PasswordChanged">
+                    <PasswordBox.InputBindings>
                         <KeyBinding Key="Enter" Command="{Binding LoginCommand}" />
-                    </TextBox.InputBindings>
-                </TextBox>
+                    </PasswordBox.InputBindings>
+                </PasswordBox>
                 <Button Content="로그인" Command="{Binding LoginCommand}" Style="{StaticResource Primary}" Margin="4,12,4,4" />
                 <TextBlock Text="{Binding Message}" Foreground="{StaticResource Down}" TextWrapping="Wrap" Margin="4,8,4,0" />
-                <TextBlock Text="예: W1001 (선삭), W2001 (밀링), W9001 (관리자)" Style="{StaticResource MutedText}" Margin="4,16,4,0" />
+                <TextBlock Text="시연용: W1001 (선삭), W2001 (밀링), W9001 (관리자) · 비밀번호 1234" Style="{StaticResource MutedText}" Margin="4,16,4,0" TextWrapping="Wrap" />
             </StackPanel>
         </Border>
     </Grid>

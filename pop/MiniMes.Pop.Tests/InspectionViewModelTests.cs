@@ -12,7 +12,7 @@ public class InspectionViewModelTests
 
     private InspectionViewModel Open(params string[] lotNos)
     {
-        var vm = new InspectionViewModel(_api, new Worker("W1001", "김도윤", "WC-100", "OPERATOR"),
+        var vm = new InspectionViewModel(_api,
             (message, isError) => (_message, _isError) = (message, isError));
         vm.ShowResults(lotNos.Select((lotNo, i) => Result(i + 1, lotNo)));
         return vm;

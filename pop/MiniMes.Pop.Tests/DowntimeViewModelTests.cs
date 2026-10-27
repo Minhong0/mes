@@ -11,7 +11,7 @@ public class DowntimeViewModelTests
 
     private async Task<DowntimeViewModel> OpenAsync()
     {
-        var vm = new DowntimeViewModel(_api, new Worker("W1001", "김도윤", "WC-100", "OPERATOR"), (m, e) => _messages.Add((m, e)));
+        var vm = new DowntimeViewModel(_api, (m, e) => _messages.Add((m, e)));
         await vm.InitializeAsync();
         await vm.ShowEquipmentAsync("CNC01");
         return vm;
@@ -58,7 +58,7 @@ public class DowntimeViewModelTests
 
         var (id, request) = Assert.Single(_api.ReasonsSent);
         Assert.Equal(2, id);
-        Assert.Equal(new ReasonRequest("W1001", "MATERIAL", "MAT_NOT_RECEIVED", "소재 입고 지연"), request);
+        Assert.Equal(new ReasonRequest("MATERIAL", "MAT_NOT_RECEIVED", "소재 입고 지연"), request);
         Assert.Equal("자재대기 · 원자재 미입고", vm.Downtimes[0].ReasonText);
         Assert.True(vm.Downtimes[0].IsConfirmed);
         Assert.Same(vm.Downtimes[0], vm.SelectedDowntime);
