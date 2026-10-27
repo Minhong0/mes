@@ -1,0 +1,68 @@
+# 푸시와 PR마다 세 가지를 확인한다.
+#   1) 서버: H2 테스트, 실제 MSSQL 통합 테스트 (Testcontainers. 저장소의 db/ddl, db/seed를 그대로 실행)
+#   2) POP·시뮬레이터: POP는 WPF라 Windows에서 테스트, 시뮬레이터는 빌드만
+#   3) Docker: docker-compose.yml과 서버·시뮬레이터 이미지가 만들어지는지
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# 같은 브랜치에 새로 푸시하면 앞의 실행은 취소한다
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: 서버 테스트 (H2 + MSSQL)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4   # Gradle 의존성 캐시
+      - name: 단위·H2 테스트
+        run: ./gradlew test
+      - name: MSSQL 통합 테스트 (Testcontainers)
+        run: ./gradlew integrationTest
+      - name: 실패하면 테스트 보고서 올리기
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-test-reports
+          path: server/build/reports/tests/
+
+  pop:
+    name: POP 테스트, 시뮬레이터 빌드
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: POP 테스트 (xUnit)
+        run: dotnet test pop/MiniMes.Pop.Tests
+      - name: 시뮬레이터 빌드
+        run: dotnet build simulator/MiniMes.Simulator
+
+  docker:
+    name: Docker 이미지 빌드
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MSSQL_SA_PASSWORD: CiOnly!2026   # compose 파일을 읽을 때 필요한 값. 컨테이너를 띄우지는 않는다
+    steps:
+      - uses: actions/checkout@v4
+      - name: compose 파일 확인
+        run: docker compose --profile app config --quiet
+      - name: 서버·시뮬레이터 이미지 빌드
+        run: docker compose --profile app build

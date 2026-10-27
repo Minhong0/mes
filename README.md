@@ -1,10 +1,12 @@
 # Mini-MES
 
+[![CI](https://github.com/Minhong0/mes/actions/workflows/ci.yml/badge.svg)](https://github.com/Minhong0/mes/actions/workflows/ci.yml)
+
 자동차 변속기 샤프트를 깎는 CNC 가공 공장(가상 기업)의 MES입니다. 스마트팩토리 부트캠프의 현황 분석 자료에서 찾은 문제를 하나씩 기능으로 풀었습니다.
 
 - **서버**: Java 21, Spring Boot 4, JPA + MyBatis, MSSQL, Thymeleaf + 순수 JS 화면
 - **현장 프로그램**: C# .NET 8 — WPF POP 단말(MVVM), 설비 시뮬레이터(MQTT)
-- **테스트**: 서버 122개(H2), 실제 MSSQL 통합 테스트 17개(Testcontainers), POP 39개(xUnit)
+- **테스트**: 서버 130개(H2), 실제 MSSQL 통합 테스트 18개(Testcontainers), POP 41개(xUnit). 푸시마다 GitHub Actions가 모두 돌립니다
 
 ![설비 현황: CNC03 온도 관리한계 초과 알람](docs/images/monitoring.png)
 
@@ -78,6 +80,7 @@ flowchart LR
 - 재귀 CTE 한 번으로 역방향(이 LOT을 만든 원자재까지)과 정방향(이 LOT이 들어간 완제품까지)을 따라갑니다.
 - 열처리는 여러 LOT을 Batch 하나로 합치고, 포장은 20개 트레이 단위로 나눕니다. 둘 다 같은 계보 테이블(투입 → 산출)로 표현합니다.
 - 문제 LOT을 하위 LOT까지 한꺼번에 보류하면 보류한 LOT은 투입할 수 없습니다. 해제는 품질 담당·관리자만 합니다.
+- 보류 한 번을 보류 건으로 따로 남깁니다. 원인 LOT 둘이 같은 하위 LOT을 막았다면, 한 원인을 해제해도 다른 원인이 풀릴 때까지 그 LOT은 계속 보류됩니다.
 
 ### 모니터링과 분석
 
@@ -101,6 +104,13 @@ flowchart LR
 
 ![보류 LOT: 검사 불합격과 직접 보류](docs/images/lot-hold.png)
 
+### 로그인과 권한
+
+- POP와 관리자 웹 모두 사번과 비밀번호로 로그인합니다. 서버는 JWT(사번, 이름, 역할, 12시간)를 서명해 주고, 요청마다 서명과 만료만 확인합니다 (세션 없음).
+- POP는 `Authorization: Bearer` 헤더로, 관리자 웹은 JS가 읽을 수 없는 HttpOnly 쿠키로 같은 토큰을 보냅니다.
+- 누가 했는지(실적, 검사, 보류, 공구 교체, 알람 확인)는 요청 본문이 아니라 토큰의 사번으로 남습니다.
+- 역할: 작업지시·집계는 관리자, 보류·해제는 품질 담당·관리자만. 토큰이 만료되면 POP는 사번을 채운 로그인 화면으로 돌아가고, 보내지 못한 실적은 다시 로그인하면 이어서 보냅니다.
+
 ## 기술적으로 고민한 것
 
 | 문제 | 해결 |
@@ -109,6 +119,8 @@ flowchart LR
 | 통신이 끊긴 동안의 설비 데이터 유실 | 시뮬레이터가 SQLite outbox에 쌓고 재전송, 서버는 messageId로 중복 제거, MQTT 영속 세션(QoS 1) |
 | 두 단말이 같은 LOT을 동시에 투입하면 수량이 틀어짐 | 투입 LOT을 `UPDLOCK`으로 잠그고 읽음. 뒤 요청은 앞 요청이 커밋할 때까지 기다렸다가 줄어든 수량을 읽음 |
 | 공구 사용 수량을 메시지마다 1씩 더하면 늦게 온 메시지·재시작한 카운트에서 틀어짐 | 설치 시각부터의 누적 카운트를 매번 다시 셈 (생산 실적과 같은 규칙). 설치 시각은 설비의 공장 시계로 잡아 배속 실행에서도 구간이 맞음 |
+| 요청 본문의 사번은 누구나 바꿔 보낼 수 있어 보류 권한을 믿을 수 없음 | 서버가 서명한 JWT의 사번·역할만 믿음. 웹은 HttpOnly·SameSite=Strict 쿠키(스크립트가 못 읽고 다른 사이트 요청에 안 실림), POP는 헤더 |
+| 원인 LOT 하나를 하위까지 해제하면, 다른 원인으로 보류된 하위 LOT까지 풀림 | 보류 건(원인 LOT, 사유)과 막은 LOT을 따로 저장. LOT은 열린 보류 건이 남아 있으면 계속 보류 |
 | 깊이를 모르는 LOT 계보 추적 | MyBatis 재귀 CTE. 취소한 실적의 계보는 지우지 않고 추적 쿼리에서 거름 |
 | 보류 대상을 추적하는 사이 다른 실적이 하위 LOT을 만듦 | 대상 LOT을 잠근 뒤 다시 추적하고, 새로 나온 LOT이 없을 때까지 반복 |
 | 관리한계를 새 데이터로 자동 갱신하면 서서히 나빠지는 설비를 놓침 | 한계를 기준 기간·표본 수와 함께 저장하고 자동으로 바꾸지 않음 |
@@ -121,9 +133,11 @@ flowchart LR
 Docker Desktop만 있으면 서버·DB·브로커·설비 시뮬레이터가 한 번에 뜹니다.
 
 ```bash
-cp .env.example .env                              # DB 비밀번호
+cp .env.example .env                              # DB 비밀번호, 토큰 서명 키
 docker compose --profile app up -d --build        # 처음에는 이미지를 만드느라 몇 분 걸립니다
 ```
+
+- 시연용 계정 (비밀번호는 모두 `1234`): `W9001` 관리자, `W6001` 품질, `W1001` 선삭, `W2001` 밀링, `W4001` 연삭
 
 - http://localhost:8080 관리자 웹 (설비 현황, 파레토, 공구 수명, 작업지시, LOT 추적, 보류 LOT), `/swagger-ui.html` API 문서
 - 처음 뜰 때 DB 스키마와 초기 데이터(기준정보, 부트캠프 2025년 10월 실적)를 자동으로 넣습니다.
@@ -133,7 +147,7 @@ docker compose --profile app up -d --build        # 처음에는 이미지를 �
 POP는 Windows WPF 프로그램이라 따로 실행합니다 (.NET 8 SDK 필요).
 
 ```bash
-dotnet run --project pop/MiniMes.Pop    # 사번 W1001 선삭, W2001 밀링, W6001 품질, W9001 관리자
+dotnet run --project pop/MiniMes.Pop    # W1001 / 1234 (선삭)
 ```
 
 개발할 때는 DB와 브로커만 띄우고 서버·시뮬레이터를 직접 실행합니다 (JDK 21, .NET 8 SDK).
@@ -147,10 +161,12 @@ dotnet run --project simulator/MiniMes.Simulator -- --speed 60    # 시뮬레이
 ## 테스트
 
 ```bash
-cd server && ./gradlew test               # H2, 122개
-cd server && ./gradlew integrationTest    # 실제 MSSQL (Docker 필요), 17개
-dotnet test pop/MiniMes.Pop.Tests         # POP 화면 로직, 39개
+cd server && ./gradlew test               # H2, 130개
+cd server && ./gradlew integrationTest    # 실제 MSSQL (Docker 필요), 18개
+dotnet test pop/MiniMes.Pop.Tests         # POP 화면 로직, 41개
 ```
+
+GitHub Actions([`.github/workflows/ci.yml`](.github/workflows/ci.yml))가 푸시와 PR마다 세 가지를 돌립니다: 서버 테스트(H2 + MSSQL), POP 테스트와 시뮬레이터 빌드(Windows), Docker 이미지 빌드.
 
 ## 구성
 
@@ -164,6 +180,7 @@ dotnet test pop/MiniMes.Pop.Tests         # POP 화면 로직, 39개
 | `tools/` | 부트캠프 엑셀과 CSV를 검증해 seed SQL로 바꾸는 스크립트 | Python |
 | `infra/` | MQTT 브로커 설정 | Mosquitto |
 | `docker-compose.yml` | 전체 실행 (DB 초기화 컨테이너, 서버·시뮬레이터 이미지) | Docker Compose |
+| `.github/workflows/` | CI: 서버·POP 테스트, 이미지 빌드 | GitHub Actions |
 | `docs/` | [ERD](docs/erd.md), [기술 결정](docs/decisions.md), 화면 캡처 | Markdown |
 
 부트캠프 원본 엑셀은 저작권 문제로 저장소에 넣지 않았습니다. 기준정보는 CSV로 옮겨 이름을 바꿨습니다.
