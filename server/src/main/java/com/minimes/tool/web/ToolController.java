@@ -1,5 +1,6 @@
 package com.minimes.tool.web;
 
+import com.minimes.auth.config.LoginWorker;
 import com.minimes.master.domain.Equipment;
 import com.minimes.master.service.MasterQueryService;
 import com.minimes.tool.domain.Tool;
@@ -45,9 +46,10 @@ public class ToolController {
 
     @Operation(summary = "공구 교체", description = "바꾼 공구의 가공 수량을 이력에 남기고 새 공구를 0개부터 센다. 그 공구의 열린 수명 알람은 닫는다")
     @PostMapping("/{toolCode}/change")
-    public ChangeResultResponse change(@PathVariable String toolCode, @Valid @RequestBody ChangeRequest req) {
+    public ChangeResultResponse change(@PathVariable String toolCode, @Valid @RequestBody ChangeRequest req,
+                                       @LoginWorker String workerId) {
         String reason = req.reason() == null || req.reason().isBlank() ? null : req.reason().trim();
-        ChangeResult result = toolLifeService.change(toolCode, new ChangeCommand(req.workerId(), reason));
+        ChangeResult result = toolLifeService.change(toolCode, new ChangeCommand(workerId, reason));
         Tool tool = result.tool();
         String equipName = masterQueryService.findEquipment().stream()
                 .filter(e -> e.getEquipCode().equals(tool.getEquipCode())).map(Equipment::getEquipName).findFirst().orElse(null);

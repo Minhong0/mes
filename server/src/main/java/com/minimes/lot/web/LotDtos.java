@@ -27,20 +27,18 @@ public final class LotDtos {
     public record ReceiveRequest(
             @NotBlank(message = "품목은 필수입니다.") String itemCode,
             @NotNull @Positive(message = "수량은 0보다 커야 합니다.") BigDecimal qty,
-            @Size(max = 30) String supplierLotNo,
-            @NotBlank(message = "작업자는 필수입니다.") String workerId
+            @Size(max = 30) String supplierLotNo
     ) {
     }
 
     /** 보류·해제 요청. includeDownstream: 이 LOT이 들어간 하위 LOT도 함께 (보내지 않으면 이 LOT만) */
     public record HoldRequest(
-            @NotBlank(message = "작업자는 필수입니다.") String workerId,
             @NotBlank(message = "사유는 필수입니다.") @Size(max = 150, message = "사유는 150자까지입니다.") String reason,
-            boolean includeDownstream
+            Boolean includeDownstream   // boolean이면 Jackson 3는 빠진 값을 오류(400)로 본다
     ) {
     }
 
-    /** changed: 상태를 바꾼 LOT, skipped: 바꾸지 않은 LOT (다 쓴·폐기·출하 LOT, 해제할 때는 보류가 아닌 LOT) */
+    /** changed: 상태를 바꾼 LOT, skipped: 바꾸지 않은 LOT (다 쓴·폐기·출하 LOT. 해제할 때는 보류가 아닌 LOT과 다른 보류 건이 남은 LOT) */
     public record HoldResponse(String lotNo, List<LotResponse> changed, List<LotResponse> skipped) {
         public static HoldResponse from(HoldResult r) {
             return new HoldResponse(r.lotNo(), r.changed().stream().map(LotResponse::from).toList(),
@@ -50,16 +48,16 @@ public final class LotDtos {
 
     /**
      * 보류 중인 LOT 한 줄. originLotNo: 보류를 건 LOT (하위로 함께 보류됐으면 원인 LOT, 아니면 이 LOT 자신).
-     * byInspection: 검사 불합격으로 자동 보류
+     * byInspection: 검사 불합격으로 자동 보류. holdCount: 이 LOT을 막고 있는 보류 건 수 (원인 LOT이 여럿이면 2 이상)
      */
     public record HeldLotResponse(String lotNo, String itemCode, String itemName, BigDecimal qty, String woNo,
                                   String lastProcess, String processName, LocalDateTime heldAt, String heldBy,
-                                  String reason, String originLotNo, boolean byInspection) {
+                                  String reason, String originLotNo, boolean byInspection, int holdCount) {
         public static HeldLotResponse from(HeldLot h, Map<String, String> itemNames, Map<String, String> processNames) {
             Lot l = h.lot();
             return new HeldLotResponse(l.getLotNo(), l.getItemCode(), itemNames.get(l.getItemCode()), l.getQty(), l.getWoNo(),
                     l.getLastProcess(), l.getLastProcess() == null ? null : processNames.get(l.getLastProcess()),
-                    h.heldAt(), h.heldBy(), h.reason(), h.originLotNo(), h.byInspection());
+                    h.heldAt(), h.heldBy(), h.reason(), h.originLotNo(), h.byInspection(), h.holdCount());
         }
     }
 

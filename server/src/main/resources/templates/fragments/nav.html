@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="ko" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!-- 모든 화면 맨 위의 메뉴. active: 지금 화면 (monitoring, pareto, tools, work-orders, trace, hold) -->
+<!-- 모든 화면 맨 위의 메뉴와 로그인한 사람. active: 지금 화면 (monitoring, pareto, tools, work-orders, trace, hold) -->
 <nav th:fragment="nav(active)" class="nav-bar" aria-label="화면 메뉴">
     <a class="brand" th:href="@{/}">Mini-MES</a>
     <a th:href="@{/monitoring}" th:classappend="${active == 'monitoring'} ? 'active'"
@@ -16,6 +16,12 @@
        th:attr="aria-current=${active == 'trace'} ? 'page'">LOT 추적</a>
     <a th:href="@{/lots/hold}" th:classappend="${active == 'hold'} ? 'active'"
        th:attr="aria-current=${active == 'hold'} ? 'page'">보류 LOT</a>
+    <!-- 로그인한 사람 (토큰의 이름·역할). 로그아웃은 nav.js가 처리한다 -->
+    <span class="nav-user" th:if="${loginWorker}">
+        <span th:text="|${loginWorker.workerName} · ${loginWorker.roleName}|">윤서연 · 관리자</span>
+        <button type="button" id="logout">로그아웃</button>
+    </span>
+    <script th:src="@{/js/nav.js}"></script>
 </nav>
 </body>
 </html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>로그인 - Mini-MES</title>
+    <link rel="stylesheet" th:href="@{/css/monitoring.css}">
+    <link rel="stylesheet" th:href="@{/css/login.css}">
+</head>
+<body th:data-login-url="@{/api/auth/login}">
+<main class="login">
+    <h1>Mini-MES</h1>
+    <p class="sub">사번과 비밀번호로 로그인하세요.</p>
+    <p id="expired" class="login-notice" hidden>로그인이 만료되었습니다. 다시 로그인하세요.</p>
+    <!-- method="post": JS가 실패해도 비밀번호가 주소(GET 쿼리)에 실리지 않게 -->
+    <form id="login-form" class="login-form" method="post">
+        <label>사번 <input name="workerId" autocomplete="username" autofocus required></label>
+        <label>비밀번호 <input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">로그인</button>
+        <p id="login-error" class="login-error" hidden></p>
+    </form>
+    <p class="muted login-demo">시연용 계정: W9001 관리자, W6001 품질, W1001 작업자 · 비밀번호 1234</p>
+</main>
+<script th:src="@{/js/login.js}"></script>
+</body>
+</html>

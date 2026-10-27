@@ -57,11 +57,10 @@
             <div><dt>공급사 LOT</dt><dd id="lot-supplier"></dd></div>
         </dl>
 
-        <!-- 품질 보류·해제: 품질 담당(QC)·관리자만. 보류한 LOT은 해제할 때까지 투입할 수 없다 -->
+        <!-- 품질 보류·해제: 품질 담당(QC)·관리자로 로그인했을 때만 된다. 보류한 LOT은 해제할 때까지 투입할 수 없다 -->
         <form id="hold" class="hold">
             <h3 class="hold-title">품질 보류</h3>
             <div class="hold-fields">
-                <label>사번 <input name="workerId" placeholder="예: W6001" size="8" autocomplete="off" required></label>
                 <label class="hold-reason">사유 <input name="reason" maxlength="150" placeholder="예: 외경 치수 불량 의심" autocomplete="off" required></label>
                 <label class="hold-check"><input type="checkbox" name="includeDownstream" checked> 이 LOT이 들어간 LOT도 함께 <span id="hold-scope"></span></label>
             </div>

@@ -14,7 +14,6 @@ public final class DowntimeDtos {
 
     /** @param dtSub 소분류 (비워도 된다) */
     public record ReasonRequest(
-            @NotBlank(message = "작업자는 필수입니다.") String workerId,
             @NotBlank(message = "정지 대분류는 필수입니다.") String dtCat,
             String dtSub,
             @Size(max = 200) String note

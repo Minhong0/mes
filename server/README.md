@@ -14,14 +14,25 @@ Java 21, Spring Boot 4.0, JPA + MyBatis, MSSQL.
 1. 저장소 루트에서 `docker compose up -d`로 MSSQL과 MQTT 브로커를 띄웁니다. DB와 초기 데이터는 [db/README.md](../db/README.md)를 참고하세요.
    스키마와 초기 데이터는 `db-init` 컨테이너가 자동으로 넣습니다.
 2. `MesServerApplication`의 ▶ 버튼으로 실행합니다. DB 비밀번호는 저장소 루트의 `.env`에서 자동으로 읽습니다.
-3. http://localhost:8080/swagger-ui.html 에서 API를 확인하고 직접 호출해 볼 수 있습니다.
+3. http://localhost:8080 에 로그인합니다 (시연용: `W9001` / `1234`). http://localhost:8080/swagger-ui.html 에서는 `POST /api/auth/login`으로 받은 `accessToken`을 [Authorize]에 넣고 API를 호출합니다.
 4. 설비 시뮬레이터(`simulator/MiniMes.Simulator`에서 `dotnet run`)를 실행하면, 서버의 MQTT 수집기가 메시지를 받아 `equipment_data`에 저장합니다.
 
-컨테이너로 실행할 때는 저장소 루트에서 `docker compose --profile app up -d --build`. `Dockerfile`이 JDK로 실행 jar를 만들고 JRE 이미지에서 실행합니다. DB·브로커 주소는 환경 변수(`DB_HOST`, `MQTT_URL`)로 바꿉니다.
+컨테이너로 실행할 때는 저장소 루트에서 `docker compose --profile app up -d --build`. `Dockerfile`이 JDK로 실행 jar를 만들고 JRE 이미지에서 실행합니다. DB·브로커 주소는 환경 변수(`DB_HOST`, `MQTT_URL`)로, 토큰 서명 키는 `JWT_SECRET`(32바이트 이상, `.env`)으로 정합니다.
+
+## 로그인과 권한
+
+- `POST /api/auth/login` (`{"workerId":"W9001","password":"1234"}`): 비밀번호는 `worker.password_hash`(BCrypt)와 비교합니다. 없는 사번, 퇴사자, 틀린 비밀번호 모두 같은 401 `LOGIN_FAILED`입니다.
+- 응답의 `accessToken`은 JWT(HS256)입니다: `sub` 사번, `name`, `role`, 만료 12시간(`mes.auth.token-ttl`). 서버는 세션을 두지 않고 요청마다 서명과 만료만 확인합니다 (Spring Security OAuth2 Resource Server).
+- 같은 토큰을 두 가지로 받습니다 (`TokenResolver`): POP·Swagger는 `Authorization: Bearer` 헤더, 관리자 웹은 로그인 응답이 심는 `MES_TOKEN` 쿠키(HttpOnly, SameSite=Strict).
+- 토큰 없이: API는 401 `UNAUTHORIZED`(공통 오류 형식), 화면은 `/login?next=원래주소`로 보냅니다. 만료·위조 토큰이면 쿠키를 지우고 "로그인이 만료되었습니다"를 보여 줍니다. 화면의 JS 호출이 401을 받으면 `nav.js`가 로그인 화면으로 보냅니다.
+- 컨트롤러는 사번을 요청 본문이 아니라 `@LoginWorker String workerId`(토큰의 `sub`)로 받습니다. 실적, 검사, 보류, 공구 교체, 정지 사유, 알람 확인 모두 같습니다.
+- 역할(`SecurityConfig`): 작업지시 만들기·상태 변경, 관리한계 계산, 일별 재집계는 `ADMIN`. 보류·해제는 `QC`·`ADMIN` (서비스도 DB의 역할을 한 번 더 봅니다). 그 밖은 로그인만 하면 됩니다. 권한이 없으면 403 `NOT_ALLOWED`.
+- CSRF 토큰은 두지 않습니다: 쿠키가 SameSite=Strict라 다른 사이트에서 보낸 요청에는 실리지 않고, POP는 쿠키를 쓰지 않습니다.
+- `JWT_SECRET`이 비어 있으면 켤 때마다 임시 키를 만듭니다 (다시 켜면 모두 다시 로그인). 시연용 비밀번호는 `db/seed/03_demo_password.sql`이 넣습니다.
 
 ## 관리자 화면
 
-모든 화면 맨 위에 같은 메뉴(설비 현황, 정지 사유 파레토, 작업지시, LOT 추적, 보류 LOT)가 있습니다. 메뉴는 `templates/fragments/nav.html` 하나이고, 각 화면이 `th:replace`로 넣습니다. http://localhost:8080/ 은 화면 목록입니다.
+모든 화면 맨 위에 같은 메뉴(설비 현황, 정지 사유 파레토, 공구 수명, 작업지시, LOT 추적, 보류 LOT)와 로그인한 사람·[로그아웃]이 있습니다. 메뉴는 `templates/fragments/nav.html` 하나이고, 각 화면이 `th:replace`로 넣습니다. http://localhost:8080/ 은 화면 목록입니다.
 
 ### 작업지시
 
@@ -43,17 +54,17 @@ http://localhost:8080/tools
   - 설치·교체 시각은 그 설비의 마지막 메시지 시각(공장 시계)입니다. 배속으로 돌리면 공장 시계가 서버 시계보다 앞서 가므로 서버 시각으로 자르면 구간이 틀어집니다.
 - 수명의 90% 이상이면 교체 임박(`WARN`), 수명에 이르면 교체 필요(`REPLACE`)와 `TOOL_LIFE` 알람(설비 현황 카드).
   - 알람은 공구를 한 번 설치한 동안 한 번만 냅니다. 확인해도 다시 생기지 않습니다 (바꾸기 전까지 계속 수명을 넘어 있으므로).
-- [교체] (`POST /api/tools/{toolCode}/change`, 사번·사유): 바꾸기 직전까지 다시 센 수량을 `tool_change_history`에 남기고 0부터 다시 셉니다. 그 공구의 열린 알람은 바꾼 사람이 확인한 것으로 닫습니다.
+- [교체] (`POST /api/tools/{toolCode}/change`, 사유. 바꾼 사람은 토큰의 사번): 바꾸기 직전까지 다시 센 수량을 `tool_change_history`에 남기고 0부터 다시 셉니다. 그 공구의 열린 알람은 바꾼 사람이 확인한 것으로 닫습니다.
 - 공구와 수명은 `data/master/tools.csv` (근거는 `data/master/README.md`). 이미 만든 DB에는 `db/ddl/12_tool_life.sql`이 넣습니다.
 
 ### 보류 LOT
 
 http://localhost:8080/lots/hold
 
-- 지금 HOLD인 LOT과 마지막 보류(때, 누가, 사유, 원인 LOT)를 최근 것부터 보여 줍니다 (`GET /api/lots/held`).
+- 지금 HOLD인 LOT과 가장 최근 보류 건(때, 누가, 사유, 원인 LOT)을 최근 것부터 보여 줍니다 (`GET /api/lots/held`). 그 LOT을 막은 보류 건이 둘 이상이면 "보류 건 n개"가 함께 나옵니다.
 - 원인은 "검사 불합격"(검사 NG로 자동 보류)과 "직접 보류"(추적 화면에서 품질 담당이 보류)로 거를 수 있습니다 (`?cause=inspection`).
 - 하위 LOT으로 함께 보류된 LOT은 원인 LOT이 따로 나옵니다. LOT 번호를 누르면 추적 화면으로 가서 해제합니다.
-- 원인 LOT과 검사 불합격 여부는 `lot_history`의 보류 메모("사유 (원인 LOT X)", "검사 불합격: ...")에서 읽습니다. 메모 형식은 `LotHoldService` 한 곳에서 만들고 읽습니다.
+- 원인 LOT, 사유, 검사 불합격 여부는 보류 건 테이블(`lot_hold`)에서 읽습니다.
 
 ## 모니터링 화면
 
@@ -68,9 +79,9 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
 
 ## POP(현장 단말) API
 
-현장 POP([pop/README.md](../pop/README.md))가 부르는 API입니다. 작업자는 로그인 세션 없이 사번(`workerId`)을 요청마다 보냅니다.
+현장 POP([pop/README.md](../pop/README.md))가 부르는 API입니다. POP는 로그인해서 받은 토큰을 요청마다 헤더로 보내고, 누가 했는지는 서버가 토큰의 사번으로 남깁니다.
 
-1. `GET /api/workers/{workerId}`로 작업자를 확인합니다 (없거나 퇴사면 404 `WORKER_NOT_FOUND`).
+1. `POST /api/auth/login`으로 로그인합니다 (위 "로그인과 권한").
 2. `GET /api/work-centers/{wcCode}/operations`로 작업장의 대기·진행 중인 공정을 받습니다. 앞 공정 양품 수량(`prevGoodQty`)이 함께 옵니다.
 3. 공정 시작 → 실적 등록(여러 번) → 공정 완료. 첫 공정을 시작하면 작업지시가 진행이 되고, 마지막 공정을 완료하면 작업지시가 완료됩니다.
 4. 실적에는 POP가 만든 `requestId`를 붙입니다. 같은 `requestId`로 다시 보내면 새로 저장하지 않고 처음 실적을 돌려줍니다 (`work_result.request_id` 필터 UNIQUE 인덱스).
@@ -80,7 +91,7 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
 
 8. 실적에는 투입한 LOT(`inputs`)을 함께 보냅니다. 아래 LOT 추적을 참고하세요.
 
-이미 만든 DB에는 `db/ddl/07_work_result_request.sql`, `db/ddl/08_downtime_reason.sql`, `db/ddl/09_lot_tracking.sql`, `db/ddl/10_routing_lot_size.sql`, `db/ddl/11_inspection.sql`, `db/scripts/add_workers.sql`(작업자 7명)을 한 번 실행합니다.
+이미 만든 DB에는 `docker compose up -d`(`db-init`)가 새 DDL을 반영합니다 ([db/README.md](../db/README.md)).
 
 ## LOT 추적
 
@@ -95,10 +106,12 @@ http://localhost:8080/monitoring/pareto 는 정지 사유 파레토입니다. �
 3. 실적 취소: 만든 LOT(나눴으면 모두)은 폐기(`SCRAPPED`)하고 투입 수량을 돌려줍니다. 만든 LOT을 이미 다음 공정에 썼으면 409 `LOT_IN_USE` (뒤 공정의 실적부터 취소).
 4. 추적: `GET /api/lots/{lotNo}/trace`가 재귀 CTE로 역방향(이 LOT을 만든 재료, 원자재까지)과 정방향(이 LOT이 들어간 곳)을 함께 돌려줍니다. 취소한 실적의 계보는 뺍니다.
 5. 이력: `GET /api/lots/{lotNo}`에 입고·생산·투입·취소·보류 이력이 일어난 순서대로 나옵니다.
-6. 품질 보류: `POST /api/lots/{lotNo}/hold`, `POST /api/lots/{lotNo}/release` (`{"workerId":"W6001","reason":"외경 치수 불량 의심","includeDownstream":true}`).
+6. 품질 보류: `POST /api/lots/{lotNo}/hold`, `POST /api/lots/{lotNo}/release` (`{"reason":"외경 치수 불량 의심","includeDownstream":true}`, `includeDownstream`을 빼면 이 LOT만).
    - 품질 담당(QC)·관리자(ADMIN)만 할 수 있습니다. 작업자는 403 `NOT_ALLOWED`.
    - `includeDownstream`이면 정방향 추적으로 이 LOT이 들어간 하위 LOT까지 한꺼번에 바꿉니다.
-   - 남은 수량이 있는(`ACTIVE`) LOT만 `HOLD`가 됩니다. 다 쓴·폐기·출하 LOT은 응답의 `skipped`에 상태와 함께 나옵니다. 해제는 `HOLD`인 LOT만 `ACTIVE`로 돌립니다.
+   - 남은 수량이 있는(`ACTIVE`) LOT만 `HOLD`가 됩니다. 다 쓴·폐기·출하 LOT은 응답의 `skipped`에 상태와 함께 나옵니다.
+   - 보류 한 번이 보류 건(`lot_hold`: 원인 LOT, 사유, 검사 불합격인가) 하나이고, 막은 LOT은 `lot_hold_target`에 남습니다. 이미 다른 건으로 보류 중인 LOT도 새 건에 묶습니다.
+   - LOT은 열린 보류 건이 하나라도 남아 있으면 보류입니다. 해제는 시작 LOT을 묶인 보류 건 모두에서 풀고, 하위 LOT은 시작 LOT과 관련된 건(시작 LOT을 묶었거나 시작 LOT이 원인인 건)에서만 풉니다. 다른 원인의 보류 건이 남은 LOT은 `HOLD` 그대로 `skipped`에 나옵니다.
    - 바꾼 LOT마다 `lot_history`에 `HOLD`·`RELEASE`와 사유를 남깁니다. 하위 LOT의 사유에는 원인 LOT 번호가 붙습니다.
    - 보류한 LOT은 투입 후보에서 빠지고, 투입하면 409 `LOT_ON_HOLD`입니다. 보류 LOT을 만든 실적은 취소할 수 없습니다(먼저 해제). 보류 LOT에 투입 수량을 되돌릴 때는 보류를 유지합니다.
    - 대상 LOT을 잠근(`UPDLOCK`) 뒤 정방향 추적을 다시 해, 그 사이 다른 실적이 만든 하위 LOT도 빠뜨리지 않습니다.
@@ -107,7 +120,7 @@ http://localhost:8080/lots/trace 는 LOT 추적 화면입니다.
 
 - LOT 번호를 넣거나, 품목을 골라 최근 LOT 목록에서 누릅니다. `?lotNo=SF-SFT-030-261019-001`처럼 주소에 LOT을 붙이면 바로 열립니다 (메신저로 링크를 보낼 수 있음).
 - LOT 카드, 회수 범위 숫자(들어간 원자재 LOT, 이 LOT이 들어간 LOT, 그중 아직 쓸 수 있는 LOT, 보류 중인 LOT), 역방향·정방향 트리, 이력을 보여 줍니다.
-- LOT 카드의 품질 보류 칸에 사번(예: W6001)과 사유를 넣고 [보류]·[보류 해제]를 누릅니다. 하위 LOT 포함은 기본으로 켜져 있습니다. 끝나면 바꾼 LOT 수와 건너뛴 LOT(소진 n개 등)을 보여 주고 다시 추적합니다.
+- 품질 담당·관리자로 로그인해 LOT 카드의 품질 보류 칸에 사유를 넣고 [보류]·[보류 해제]를 누릅니다. 하위 LOT 포함은 기본으로 켜져 있습니다. 끝나면 바꾼 LOT 수와 건너뛴 LOT(소진 n개 등)을 보여 주고 다시 추적합니다.
 - 트리의 LOT 번호를 누르면 그 LOT으로 다시 추적하고, 브라우저 [뒤로]로 돌아갑니다.
 - 화면은 모니터링 화면처럼 빈 틀(`templates/lot-trace.html`)이고, `static/js/lot-trace.js`가 두 API를 불러 그립니다.
 
@@ -118,7 +131,7 @@ LOT 추적을 넣기 전에 시작한 작업지시는 앞 공정 LOT이 없어 �
 LOT을 만든 공정(`lot.last_process`)의 검사 항목(`inspection_spec`)을 시료 여러 개로 재고, 서버가 하한·상한으로 판정합니다. 입력은 POP의 [검사] 탭에서 합니다.
 
 1. 검사표: `GET /api/lots/{lotNo}/inspection` → 검사 항목(하한·상한·단위)과, 이미 검사했으면 시료별 측정값과 판정. 검사 항목이 없는 공정(세척, 포장)과 원자재 LOT은 `items`가 빕니다.
-2. 등록: `POST /api/lots/{lotNo}/inspection` (`{"workerId":"W1001","measurements":[{"inspectCode":"OD","sampleNo":1,"value":38.01}, ...]}`)
+2. 등록: `POST /api/lots/{lotNo}/inspection` (`{"measurements":[{"inspectCode":"OD","sampleNo":1,"value":38.01}, ...]}`)
    - 모든 항목을 시료 1번부터 n번까지(최대 10) 빠짐없이 보내야 합니다. 빠지거나, 다른 공정 항목이거나, 같은 시료를 두 번 적으면 400.
    - 값마다 하한 이상·상한 이하(경계 포함)면 OK, 아니면 NG. 한쪽 한계만 있는 항목(표면 거칠기는 상한만)은 다른 쪽을 보지 않습니다.
    - 하나라도 NG면 LOT이 불합격이고, 같은 트랜잭션에서 이 LOT과 하위 LOT을 보류합니다(위 품질 보류와 같은 방식, 역할 확인 없음). 해제는 QC·ADMIN만 합니다.
@@ -196,6 +209,10 @@ IntelliJ에서는 테스트 클래스 옆의 ▶ 버튼으로 하나씩 실행�
 
 ```
 com.minimes
+├─ auth           로그인과 권한
+│  ├─ config      SecurityConfig (JWT 서명·검증, 역할), LoginWorker(토큰의 사번), Swagger 토큰 입력
+│  ├─ service     AuthService (비밀번호 확인), TokenService (토큰 만들기)
+│  └─ web         AuthController (/api/auth), 토큰 쿠키·꺼내기, 401·403 응답, 로그인 화면
 ├─ common
 │  ├─ config      Clock, 스케줄러, WebSocket(STOMP) 공통 설정
 │  └─ error       ErrorCode, BusinessException, 공통 오류 응답, 전역 예외 처리
@@ -256,47 +273,50 @@ com.minimes
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
+| POST | `/api/auth/login` | 로그인 (`{"workerId":"W9001","password":"1234"}`). 토큰, 작업자, 쿠키 |
+| POST | `/api/auth/logout` | 관리자 웹 쿠키 지우기 |
+| GET | `/api/auth/me` | 토큰의 사번, 이름, 역할, 만료 |
 | GET | `/api/items?type=FG` | 품목 목록 (type 생략 가능) |
 | GET | `/api/items/{itemCode}` | 품목 단건 |
 | GET | `/api/items/{itemCode}/routings` | 라우팅 |
 | GET | `/api/items/{itemCode}/bom-tree` | BOM 전개 |
 | GET | `/api/equipment` | 설비 목록 |
 | GET | `/api/common-codes/{groupCode}` | 공통코드 |
-| POST | `/api/work-orders` | 작업지시 생성 |
+| POST | `/api/work-orders` | 작업지시 생성 (ADMIN) |
 | GET | `/api/work-orders?status=RUN` | 작업지시 목록 (공정마다 `processName` 포함) |
 | GET | `/api/work-orders/{woNo}` | 작업지시 단건 |
 | POST | `/api/work-orders/{woNo}/start` | 시작 (대기 → 진행) |
 | POST | `/api/work-orders/{woNo}/complete` | 완료 (진행 → 완료) |
 | POST | `/api/work-orders/{woNo}/close` | 마감 (완료 → 마감) |
-| GET | `/api/workers/{workerId}` | 작업자 확인 (POP 로그인) |
+| GET | `/api/workers/{workerId}` | 작업자 단건 |
 | GET | `/api/work-centers/{wcCode}/operations` | 작업장의 대기·진행 중인 공정 (POP 작업 목록) |
-| POST | `/api/operations/{woOpId}/start` | 공정 시작 (`{"workerId":"W1001"}`) |
-| POST | `/api/operations/{woOpId}/results` | 실적 등록 (`requestId`, `workerId`, `equipCode`, `goodQty`, `defects[]`, `inputs[]`). 응답에 만든 LOT(`outputLotNos`, 포장은 여러 개) |
+| POST | `/api/operations/{woOpId}/start` | 공정 시작 |
+| POST | `/api/operations/{woOpId}/results` | 실적 등록 (`requestId`, `equipCode`, `goodQty`, `defects[]`, `inputs[]`). 응답에 만든 LOT(`outputLotNos`, 포장은 여러 개) |
 | GET | `/api/operations/{woOpId}/input-lots` | 공정에 투입할 품목과 쓸 수 있는 LOT (먼저 들어온 것부터) |
 | GET | `/api/operations/{woOpId}/results` | 공정의 실적 목록 (취소 포함) |
 | POST | `/api/operations/{woOpId}/complete` | 공정 완료 (마지막 공정이면 작업지시도 완료) |
-| POST | `/api/results/{resultId}/cancel` | 실적 취소 (`{"workerId":"W1001","reason":"수량 오입력"}`) |
+| POST | `/api/results/{resultId}/cancel` | 실적 취소 (`{"reason":"수량 오입력"}`) |
 | GET | `/api/equipment/{equipCode}/downtimes?limit=10` | 설비가 남긴 최근 정지 (POP 정지 사유 입력) |
-| PUT | `/api/downtimes/{downtimeId}/reason` | 정지 사유 확정 (`{"workerId":"W1001","dtCat":"MATERIAL","dtSub":"MAT_NOT_RECEIVED","note":"..."}`) |
-| POST | `/api/lots/receive` | 원자재 입고 (`{"itemCode":"RM-SCM-001","qty":100,"supplierLotNo":"A-1018","workerId":"W1001"}`) |
+| PUT | `/api/downtimes/{downtimeId}/reason` | 정지 사유 확정 (`{"dtCat":"MATERIAL","dtSub":"MAT_NOT_RECEIVED","note":"..."}`) |
+| POST | `/api/lots/receive` | 원자재 입고 (`{"itemCode":"RM-SCM-001","qty":100,"supplierLotNo":"A-1018"}`) |
 | GET | `/api/lots?itemCode=RM-SCM-001&status=ACTIVE` | 품목의 LOT 목록 (최근 100개) |
 | GET | `/api/tools` | 공구 목록 (사용 수량, 수명, 남은 수량, 상태) |
-| POST | `/api/tools/{toolCode}/change` | 공구 교체 (`{"workerId":"W4001","reason":"수명 도달"}`). 응답에 새 공구와 남긴 이력 |
+| POST | `/api/tools/{toolCode}/change` | 공구 교체 (`{"reason":"수명 도달"}`). 응답에 새 공구와 남긴 이력 |
 | GET | `/api/tools/changes?toolCode=T-CNC05-WHL` | 교체 이력 (최근 50건, toolCode 생략 가능) |
-| GET | `/api/lots/held` | 보류 중인 LOT과 마지막 보류 (사유, 원인 LOT, 검사 불합격인가) |
+| GET | `/api/lots/held` | 보류 중인 LOT과 가장 최근 보류 건 (사유, 원인 LOT, 검사 불합격인가, 보류 건 수) |
 | GET | `/api/lots/{lotNo}` | LOT과 이력 (공정 이름 포함) |
 | GET | `/api/lots/{lotNo}/trace` | 역방향(`backward`)·정방향(`forward`) 추적 |
-| POST | `/api/lots/{lotNo}/hold` | 품질 보류 (`{"workerId":"W6001","reason":"...","includeDownstream":true}`). QC·ADMIN만 |
+| POST | `/api/lots/{lotNo}/hold` | 품질 보류 (`{"reason":"...","includeDownstream":true}`). QC·ADMIN만 |
 | POST | `/api/lots/{lotNo}/release` | 보류 해제 (요청 형식은 보류와 같음) |
 | GET | `/api/lots/{lotNo}/inspection` | 검사표: LOT을 만든 공정의 검사 항목과 측정값·판정 |
-| POST | `/api/lots/{lotNo}/inspection` | 검사 등록 (`{"workerId":"W1001","measurements":[{"inspectCode":"OD","sampleNo":1,"value":38.01}]}`). NG면 자동 보류 |
+| POST | `/api/lots/{lotNo}/inspection` | 검사 등록 (`{"measurements":[{"inspectCode":"OD","sampleNo":1,"value":38.01}]}`). NG면 자동 보류 |
 | GET | `/api/monitoring/dashboard` | 설비 현황 (현재 상태, 정지 사유, 센서값, 오늘 OEE) |
 | GET | `/api/oee/daily?date=2025-10-01` | 설비별 일별 OEE와 근거 숫자 |
 | GET | `/api/oee/monthly?month=2025-10` | 설비별 월별 OEE (시간·수량 합산 후 계산) |
-| POST | `/api/production-daily/aggregate?date=2026-10-17` | 그날 집계 다시 하기 |
+| POST | `/api/production-daily/aggregate?date=2026-10-17` | 그날 집계 다시 하기 (ADMIN) |
 | GET | `/api/monitoring/downtime-pareto?from=2025-10-01&to=2025-10-31&equipCode=CNC03&byReason=true` | 정지 사유 파레토 (모든 조건 생략 가능) |
 | GET | `/api/alarms?open=true` | 알람 목록 (open=false면 최근 100건) |
-| POST | `/api/alarms/{alarmId}/ack` | 알람 확인 (`{"ackBy":"kim"}`) |
+| POST | `/api/alarms/{alarmId}/ack` | 알람 확인 (확인자는 토큰의 사번) |
 | GET | `/api/equipment-limits` | 설비별 관리한계 |
 | POST | `/api/equipment-limits/calculate?from=&to=` | 관리한계 계산 (기준 기간 가동 데이터, UCL = 평균 + 3σ) |
 | WebSocket | `/ws` → 구독 `/topic/dashboard` | 대시보드 실시간 수신 (STOMP, 본문은 `/api/monitoring/dashboard`와 같음) |

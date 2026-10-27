@@ -4,7 +4,6 @@ import com.minimes.alarm.domain.AlarmType;
 import com.minimes.alarm.domain.EquipmentAlarm;
 import com.minimes.alarm.domain.EquipmentLimit;
 import com.minimes.alarm.domain.LimitMetric;
-import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -15,9 +14,6 @@ public final class AlarmDtos {
     private AlarmDtos() {
     }
 
-    /** @param ackBy 확인한 사람 (로그인이 없어서 화면이 정해 보낸다). 비우면 "UNKNOWN" */
-    public record AckRequest(@Size(max = 20) String ackBy) {
-    }
 
     public record AlarmResponse(long alarmId, String equipCode, AlarmType alarmType, BigDecimal measuredValue,
                                 BigDecimal limitValue, LocalDateTime occurredAt, LocalDateTime ackAt, String ackBy) {

@@ -4,6 +4,8 @@ import com.minimes.equipment.mqtt.EquipmentMessage;
 import com.minimes.equipment.service.EquipmentDataService;
 import com.minimes.monitoring.service.Dashboard;
 import com.minimes.monitoring.service.MonitoringService;
+import com.minimes.support.TestLogin;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +23,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.socket.WebSocketHttpHeaders;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
 
@@ -66,6 +69,9 @@ class DashboardPushTest {
     @MockitoBean
     MonitoringService monitoringService;
 
+    @Autowired
+    JwtEncoder jwtEncoder;
+
     WebSocketStompClient client;
     StompSession session;
     final BlockingQueue<String> received = new LinkedBlockingQueue<>();
@@ -76,7 +82,9 @@ class DashboardPushTest {
                 new Dashboard(LocalDateTime.of(2026, 10, 18, 10, 5), LocalDate.of(2026, 10, 18), List.of()));
 
         client = new WebSocketStompClient(new StandardWebSocketClient());
-        session = client.connectAsync("ws://localhost:" + port + "/ws", new StompSessionHandlerAdapter() {})
+        WebSocketHttpHeaders headers = new WebSocketHttpHeaders();   // 접속(handshake)도 로그인이 필요하다
+        headers.setBearerAuth(TestLogin.token(jwtEncoder, "W9001", "ADMIN"));
+        session = client.connectAsync("ws://localhost:" + port + "/ws", headers, new StompSessionHandlerAdapter() {})
                 .get(5, TimeUnit.SECONDS);
         session.subscribe(DashboardPusher.TOPIC, new StompFrameHandler() {
             @Override

@@ -1,20 +1,18 @@
 package com.minimes.alarm.web;
 
+import com.minimes.auth.config.LoginWorker;
 import com.minimes.alarm.service.AlarmService;
 import com.minimes.alarm.service.LimitCalculationService;
-import com.minimes.alarm.web.AlarmDtos.AckRequest;
 import com.minimes.alarm.web.AlarmDtos.AlarmResponse;
 import com.minimes.alarm.web.AlarmDtos.LimitResponse;
 import com.minimes.common.error.BusinessException;
 import com.minimes.common.error.ErrorCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,11 +35,10 @@ public class AlarmController {
         return alarmService.findAlarms(open).stream().map(AlarmResponse::from).toList();
     }
 
-    @Operation(summary = "알람 확인", description = "확인한 알람은 대시보드에서 사라진다. 이미 확인했으면 409")
+    @Operation(summary = "알람 확인", description = "확인한 알람은 대시보드에서 사라진다. 확인자는 로그인한 사번. 이미 확인했으면 409")
     @PostMapping("/alarms/{alarmId}/ack")
-    public AlarmResponse acknowledge(@PathVariable long alarmId, @Valid @RequestBody(required = false) AckRequest req) {
-        String ackBy = req == null || req.ackBy() == null || req.ackBy().isBlank() ? "UNKNOWN" : req.ackBy();
-        return AlarmResponse.from(alarmService.acknowledge(alarmId, ackBy));
+    public AlarmResponse acknowledge(@PathVariable long alarmId, @LoginWorker String workerId) {
+        return AlarmResponse.from(alarmService.acknowledge(alarmId, workerId));
     }
 
     @Operation(summary = "관리한계 목록")

@@ -27,9 +27,8 @@
     <div class="tile"><span>교체 필요 (수명 도달)</span><strong id="count-replace">-</strong></div>
 </section>
 
-<!-- 교체한 사람과 사유. 표의 [교체]를 누르면 이 값으로 기록한다 -->
+<!-- 교체 사유. 표의 [교체]를 누르면 이 사유와 로그인한 사번으로 기록한다 -->
 <form id="change" class="panel change-form">
-    <label>사번 <input name="workerId" placeholder="예: W1001" size="8" autocomplete="off" required></label>
     <label class="change-reason">사유
         <input name="reason" list="reasons" maxlength="100" value="수명 도달" autocomplete="off">
         <datalist id="reasons">

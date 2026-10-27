@@ -32,6 +32,30 @@
 .nav-bar a.active { background: var(--card); color: var(--accent); font-weight: 600; box-shadow: inset 0 0 0 1px var(--line); }
 .nav-bar .brand { margin-right: 8px; padding-left: 0; color: var(--text); font-weight: 700; }
 .nav-bar .brand:hover { background: none; }
+/* 로그인한 사람: 오른쪽 끝. 좁은 화면에서 메뉴를 밀어도 로그아웃이 보이게 오른쪽에 붙여 둔다 */
+.nav-user {
+    position: sticky;
+    right: 0;
+    margin-left: auto;
+    padding-left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg);
+    color: var(--muted);
+}
+@media (max-width: 640px) {
+    .nav-user > span { display: none; }   /* 좁으면 이름은 빼고 로그아웃만 */
+}
+.nav-user button {
+    padding: 4px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+}
 
 body {
     margin: 0;

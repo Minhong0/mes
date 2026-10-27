@@ -197,6 +197,10 @@ class LotHoldTest {
         assertThat(all.changed()).extracting(Lot::getLotNo).containsExactly(turned);
         assertThat(lotService.detail(bar.getLotNo()).history()).extracting(LotHistory::getEventType)
                 .doesNotContain(LotEventType.HOLD);
+
+        // 원인 LOT은 다 써서 보류 대상이 아니었어도, 원인 LOT으로 하위까지 해제하면 그 보류 건이 풀린다
+        HoldResult released = holdService.release(bar.getLotNo(), new HoldCommand(QC, "재검사 합격", true));
+        assertThat(released.changed()).extracting(Lot::getLotNo).containsExactly(turned);
     }
 
     @Test
@@ -246,6 +250,58 @@ class LotHoldTest {
         assertThat(lot(turned).getQty()).isEqualByComparingTo("5");
 
         expectError(ErrorCode.LOT_ON_HOLD, () -> operationService.cancel(turnedResult.getResultId(), "W1001", "수량 오입력"));
+    }
+
+    @Test
+    @DisplayName("원인 LOT 둘이 같은 하위 LOT을 보류: 한 원인을 하위까지 해제해도 다른 원인의 보류 건이 남아 계속 보류. 둘 다 해제하면 풀린다")
+    void twoOrigins() {
+        Lot a = receive(10);
+        Lot b = receive(10);
+        Lot merged = receive(5);   // a와 b가 함께 들어간 하위 LOT이라고 친다 (예: 열처리 Batch)
+        forward(a.getLotNo(), merged.getLotNo());
+        forward(b.getLotNo(), merged.getLotNo());
+        holdService.hold(a.getLotNo(), by(QC, true));
+        HoldResult second = holdService.hold(b.getLotNo(), by(QC, true));
+        assertThat(second.changed()).extracting(Lot::getLotNo).containsExactly(b.getLotNo());
+        assertThat(second.skipped()).extracting(Lot::getLotNo).containsExactly(merged.getLotNo());   // 이미 보류: 이 건에도 묶인다
+        assertThat(holdService.heldLots()).filteredOn(h -> h.lot().getLotNo().equals(merged.getLotNo())).singleElement()
+                .satisfies(h -> {
+                    assertThat(h.holdCount()).isEqualTo(2);
+                    assertThat(h.originLotNo()).isEqualTo(b.getLotNo());   // 가장 최근 보류 건
+                });
+
+        HoldResult releaseA = holdService.release(a.getLotNo(), new HoldCommand(QC, "a 재검사 합격", true));
+
+        assertThat(releaseA.changed()).extracting(Lot::getLotNo).containsExactly(a.getLotNo());
+        assertThat(releaseA.skipped()).extracting(Lot::getLotNo).containsExactly(merged.getLotNo());
+        assertThat(lot(merged.getLotNo()).getStatus()).isEqualTo(LotStatus.HOLD);
+        assertThat(holdService.heldLots()).filteredOn(h -> h.lot().getLotNo().equals(merged.getLotNo())).singleElement()
+                .satisfies(h -> {
+                    assertThat(h.holdCount()).isEqualTo(1);
+                    assertThat(h.originLotNo()).isEqualTo(b.getLotNo());
+                });
+
+        holdService.release(b.getLotNo(), new HoldCommand(QC, "b 재검사 합격", true));
+        assertThat(lot(merged.getLotNo()).getStatus()).isEqualTo(LotStatus.ACTIVE);
+        assertThat(holdService.heldLots()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("이 LOT만 해제: 그 LOT을 묶은 보류 건 모두에서 풀린다 (이 LOT은 괜찮다고 판단). 원인 LOT은 그대로 보류")
+    void releaseOnlyThisLot() {
+        Lot a = receive(10);
+        Lot b = receive(10);
+        Lot merged = receive(5);
+        forward(a.getLotNo(), merged.getLotNo());
+        forward(b.getLotNo(), merged.getLotNo());
+        holdService.hold(a.getLotNo(), by(QC, true));
+        holdService.hold(b.getLotNo(), by(QC, true));
+
+        HoldResult result = holdService.release(merged.getLotNo(), new HoldCommand(QC, "전수 검사 합격", false));
+
+        assertThat(result.changed()).extracting(Lot::getLotNo).containsExactly(merged.getLotNo());
+        assertThat(holdService.heldLots()).extracting(h -> h.lot().getLotNo())
+                .containsExactlyInAnyOrder(a.getLotNo(), b.getLotNo());
     }
 
     @Test

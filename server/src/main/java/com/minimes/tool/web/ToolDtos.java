@@ -14,7 +14,6 @@ public final class ToolDtos {
     }
 
     public record ChangeRequest(
-            @NotBlank(message = "작업자는 필수입니다.") String workerId,
             @Size(max = 100, message = "사유는 100자까지입니다.") String reason
     ) {
     }

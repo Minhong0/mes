@@ -12,7 +12,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
-/** 작업자. 테이블: worker. POP는 사번으로 작업자를 확인하고, 실적에 누가 했는지 남긴다. */
+/** 작업자. 테이블: worker. 사번과 비밀번호로 로그인하고(POP, 관리자 웹), 실적에 누가 했는지 남긴다. */
 @Entity
 @Table(name = "worker")
 @Getter
@@ -34,6 +34,9 @@ public class Worker {
     private String useYn;
 
     private LocalDateTime createdAt;
+
+    /** 비밀번호 BCrypt 해시. null이면 로그인할 수 없다 (시연용 비밀번호는 db/seed/03_demo_password.sql) */
+    private String passwordHash;
 
     public boolean isActive() {
         return "Y".equals(useYn);

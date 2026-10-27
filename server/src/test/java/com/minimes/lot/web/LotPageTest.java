@@ -1,5 +1,7 @@
 package com.minimes.lot.web;
 
+import com.minimes.support.TestLogin;
+import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TestLogin.AsAdmin.class)
 @ActiveProfiles("test")
 @Transactional
 @Sql({"/sql/work-order-fixture.sql", "/sql/pop-fixture.sql", "/sql/lot-fixture.sql"})
@@ -48,9 +51,10 @@ class LotPageTest {
     @DisplayName("LOT 상세: 이력의 공정 이름과 LOT을 만든 공정 이름이 함께 온다. 없는 LOT은 404")
     void detailWithProcessNames() throws Exception {
         String receive = """
-                {"itemCode": "RM-SCM-001", "qty": 10, "workerId": "W1001"}
+                {"itemCode": "RM-SCM-001", "qty": 10}
                 """;
-        String body = mockMvc.perform(post("/api/lots/receive").contentType(MediaType.APPLICATION_JSON).content(receive))
+        String body = mockMvc.perform(post("/api/lots/receive").with(TestLogin.as("W1001", "OPERATOR"))
+                        .contentType(MediaType.APPLICATION_JSON).content(receive))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String lotNo = com.jayway.jsonpath.JsonPath.read(body, "$.lotNo");

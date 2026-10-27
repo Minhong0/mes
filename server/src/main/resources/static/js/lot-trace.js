@@ -6,7 +6,6 @@ const LOTS_URL = document.body.dataset.lotsUrl;
 const ITEMS_URL = document.body.dataset.itemsUrl;
 const form = document.getElementById('search');
 const holdForm = document.getElementById('hold');
-const WORKER_KEY = 'mes.lotTrace.workerId';
 const $ = id => document.getElementById(id);
 
 const STATUS_NAMES = { ACTIVE: '사용 가능', HOLD: '보류', CONSUMED: '소진', SHIPPED: '출하', SCRAPPED: '폐기' };
@@ -199,6 +198,8 @@ function renderInspection(sheet) {
 // ---- 품질 보류·해제 ----
 
 const SKIP_NAMES = { HOLD: '이미 보류', ACTIVE: '보류 아님', CONSUMED: '소진', SHIPPED: '출하', SCRAPPED: '폐기' };
+// 해제할 때 보류로 남은 LOT = 다른 원인 LOT의 보류 건이 아직 열려 있다
+const RELEASE_SKIP_NAMES = { ...SKIP_NAMES, HOLD: '다른 보류 건으로 계속 보류' };
 
 function showHoldResult(message, isError = false) {
     const p = $('hold-result');
@@ -208,10 +209,11 @@ function showHoldResult(message, isError = false) {
 }
 
 // 예: "3개 LOT을 보류했습니다. 바꾸지 않은 LOT: 소진 1개"
-function holdSummary(verb, response) {
+function holdSummary(verb, response, release) {
+    const names = release ? RELEASE_SKIP_NAMES : SKIP_NAMES;
     const skipped = {};
     response.skipped.forEach(l => { skipped[l.status] = (skipped[l.status] ?? 0) + 1; });
-    const skippedText = Object.entries(skipped).map(([status, n]) => `${SKIP_NAMES[status] ?? status} ${n}개`).join(', ');
+    const skippedText = Object.entries(skipped).map(([status, n]) => `${names[status] ?? status} ${n}개`).join(', ');
     const head = response.changed.length ? `${response.changed.length}개 LOT을 ${verb}했습니다.` : `${verb}한 LOT이 없습니다.`;
     return skippedText ? `${head} 바꾸지 않은 LOT: ${skippedText}` : head;
 }
@@ -222,7 +224,6 @@ holdForm.addEventListener('submit', async event => {
     const verb = release ? '보류 해제' : '보류';
     const lotNo = current;
     const data = {
-        workerId: holdForm.workerId.value.trim(),
         reason: holdForm.reason.value.trim(),
         includeDownstream: holdForm.includeDownstream.checked,
     };
@@ -233,22 +234,20 @@ holdForm.addEventListener('submit', async event => {
     const scope = data.includeDownstream ? `${lotNo}과 이 LOT이 들어간 LOT` : lotNo;
     if (!confirm(`${scope}을 ${verb}합니다.\n사유: ${data.reason}`)) return;
 
-    try { localStorage.setItem(WORKER_KEY, data.workerId); } catch { /* 저장하지 못해도 다음에 다시 적으면 된다 */ }
     const buttons = holdForm.querySelectorAll('button');
     buttons.forEach(b => { b.disabled = true; });
     try {
         const response = await postJson(`${LOTS_URL}/${encodeURIComponent(lotNo)}/${release ? 'release' : 'hold'}`, data);
         holdForm.reason.value = '';
-        showHoldResult(holdSummary(verb, response));
+        showHoldResult(holdSummary(verb, response, release));
         await trace(lotNo, false);
     } catch (e) {
-        showHoldResult(e.message, true);   // 403이면 "LOT 보류·해제는 품질 담당이나 관리자만 할 수 있습니다"
+        showHoldResult(e.message, true);   // 403이면 "이 작업을 할 권한이 없습니다." (품질 담당·관리자만)
     } finally {
         buttons.forEach(b => { b.disabled = false; });
     }
 });
 
-try { holdForm.workerId.value = localStorage.getItem(WORKER_KEY) ?? ''; } catch { /* 저장소를 쓸 수 없는 브라우저 */ }
 
 // ---- 품목별 최근 LOT ----
 

@@ -24,10 +24,9 @@ public final class InspectionDtos {
     }
 
     public record InspectRequest(
-            @NotBlank(message = "작업자는 필수입니다.") String workerId,
             @NotEmpty(message = "측정값이 없습니다.") List<@Valid MeasurementRequest> measurements
     ) {
-        public InspectCommand toCommand() {
+        public InspectCommand toCommand(String workerId) {
             return new InspectCommand(workerId, measurements.stream()
                     .map(m -> new Measurement(m.inspectCode(), m.sampleNo(), m.value())).toList());
         }

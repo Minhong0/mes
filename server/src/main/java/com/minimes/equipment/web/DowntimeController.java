@@ -1,5 +1,6 @@
 package com.minimes.equipment.web;
 
+import com.minimes.auth.config.LoginWorker;
 import com.minimes.equipment.service.DowntimeService;
 import com.minimes.equipment.service.DowntimeService.ReasonCommand;
 import com.minimes.equipment.web.DowntimeDtos.DowntimeResponse;
@@ -35,8 +36,9 @@ public class DowntimeController {
 
     @Operation(summary = "정지 사유 확정", description = "대분류·소분류(DT_CAT, DT_SUB)를 작업자가 정한다. 같은 내용으로 다시 보내도 결과가 같다")
     @PutMapping("/downtimes/{downtimeId}/reason")
-    public DowntimeResponse confirmReason(@PathVariable long downtimeId, @Valid @RequestBody ReasonRequest req) {
-        ReasonCommand command = new ReasonCommand(req.workerId(), req.dtCat(),
+    public DowntimeResponse confirmReason(@PathVariable long downtimeId, @Valid @RequestBody ReasonRequest req,
+                                          @LoginWorker String workerId) {
+        ReasonCommand command = new ReasonCommand(workerId, req.dtCat(),
                 req.dtSub() == null || req.dtSub().isBlank() ? null : req.dtSub(),
                 req.note() == null || req.note().isBlank() ? null : req.note().trim());
         return DowntimeResponse.from(downtimeService.confirmReason(downtimeId, command));

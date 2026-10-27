@@ -63,6 +63,8 @@ function render() {
         const originCell = el('td', 'lot-cell');
         if (h.originLotNo === h.lotNo) originCell.append(el('span', 'muted-inline', '이 LOT'));
         else originCell.append(traceLink(h.originLotNo));
+        // 원인 LOT이 여럿이면 한 원인을 해제해도 계속 보류된다
+        if (h.holdCount > 1) originCell.append(el('small', 'code', `보류 건 ${h.holdCount}개`));
 
         tr.append(lotCell, itemCell, el('td', 'num', qty(h.qty)), woCell, whenCell, causeCell, el('td', 'reason', h.reason ?? ''), originCell);
         return tr;

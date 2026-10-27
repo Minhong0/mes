@@ -19,7 +19,6 @@ const ALARM_LABEL = {
     TEMP_UCL: { name: '온도 관리한계 초과', unit: '°C', digits: 1 },
     TOOL_LIFE: { name: '공구 수명 도달', unit: '', digits: 0 },
 };
-const ACK_BY = 'MONITOR';   // 로그인이 없어서, 이 화면에서 확인한 알람은 확인자를 MONITOR로 남긴다
 
 let pollTimer = null;
 
@@ -143,11 +142,8 @@ function renderAlarm(alarm) {
 async function acknowledge(alarmId, button) {
     button.disabled = true;
     try {
-        const response = await fetch(`${ALARM_URL}/${alarmId}/ack`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ackBy: ACK_BY }),
-        });
+        // 확인한 사람은 서버가 로그인 토큰의 사번으로 남긴다
+        const response = await fetch(`${ALARM_URL}/${alarmId}/ack`, { method: 'POST' });
         // 409 = 다른 화면에서 먼저 확인했다. 어느 쪽이든 최신 화면을 다시 받으면 알람이 사라진다
         if (!response.ok && response.status !== 409) {
             throw new Error(`HTTP ${response.status}`);

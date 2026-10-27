@@ -1,10 +1,9 @@
 // 공구 수명: /api/tools(목록)와 /api/tools/changes(교체 이력)를 30초마다 다시 읽어 그린다.
-// [교체]는 위 칸의 사번·사유로 POST /api/tools/{toolCode}/change 를 부른다.
+// [교체]는 위 칸의 사유로 POST /api/tools/{toolCode}/change 를 부른다. 바꾼 사람은 서버가 로그인 토큰으로 남긴다.
 
 const TOOLS_URL = document.body.dataset.toolsUrl;
 const $ = id => document.getElementById(id);
 const form = $('change');
-const WORKER_KEY = 'mes.tools.workerId';
 const REFRESH_MS = 30000;
 
 const TYPE_NAMES = { INSERT: '인서트', ENDMILL: '엔드밀', DRILL: '드릴', WHEEL: '연삭석' };
@@ -109,34 +108,26 @@ async function load() {
 }
 
 async function change(tool, button) {
-    const workerId = form.workerId.value.trim();
-    if (!workerId) {
-        showResult('사번을 넣어 주세요.', true);
-        form.workerId.focus();
-        return;
-    }
     const reason = form.reason.value.trim();
     if (!confirm(`${tool.toolName}(${tool.toolCode})을 바꿨습니까?\n바꾸기 전까지 가공한 수량을 이력에 남기고 0부터 다시 셉니다.`)) return;
 
-    try { localStorage.setItem(WORKER_KEY, workerId); } catch { /* 저장하지 못해도 다음에 다시 적으면 된다 */ }
     button.disabled = true;
     try {
         const result = await getJson(`${TOOLS_URL}/${encodeURIComponent(tool.toolCode)}/change`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ workerId, reason }),
+            body: JSON.stringify({ reason }),
         });
         // 서버가 바꾸기 직전에 다시 센 수량 (화면의 숫자는 최대 30초 전 것)
         showResult(`${tool.toolCode}를 바꿨습니다. 가공한 수량 ${result.change.usedCount}개를 이력에 남겼습니다.`, false);
         await load();
     } catch (e) {
-        showResult(e.message, true);   // 예: "작업자를 찾을 수 없습니다: W0000"
+        showResult(e.message, true);   // 예: "공구를 찾을 수 없습니다: T-NONE"
         button.disabled = false;
     }
 }
 
 form.addEventListener('submit', event => event.preventDefault());
-try { form.workerId.value = localStorage.getItem(WORKER_KEY) ?? ''; } catch { /* 저장소를 쓸 수 없는 브라우저 */ }
 
 load();
 setInterval(load, REFRESH_MS);

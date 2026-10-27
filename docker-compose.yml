@@ -57,6 +57,7 @@ services:
       DB_HOST: mssql
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
       MQTT_URL: tcp://mosquitto:1883
+      JWT_SECRET: ${JWT_SECRET:-}   # .env에 없으면 임시 키 (서버 컨테이너를 다시 만들면 다시 로그인)
       TZ: Asia/Seoul
     ports:
       - "8080:8080"

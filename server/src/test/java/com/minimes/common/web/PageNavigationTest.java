@@ -1,5 +1,7 @@
 package com.minimes.common.web;
 
+import com.minimes.support.TestLogin;
+import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -19,6 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** 관리자 화면들: 틀(템플릿)이 뜨고, 맨 위 메뉴(fragments/nav.html)에서 지금 화면이 표시되고, JS가 쓸 API 주소가 data-*로 넘어간다. */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TestLogin.AsAdmin.class)
 @ActiveProfiles("test")
 class PageNavigationTest {
 

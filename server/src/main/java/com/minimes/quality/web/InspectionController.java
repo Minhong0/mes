@@ -1,5 +1,6 @@
 package com.minimes.quality.web;
 
+import com.minimes.auth.config.LoginWorker;
 import com.minimes.quality.service.InspectionService;
 import com.minimes.quality.web.InspectionDtos.InspectRequest;
 import com.minimes.quality.web.InspectionDtos.InspectionResponse;
@@ -31,7 +32,8 @@ public class InspectionController {
     @Operation(summary = "검사 등록", description = "모든 항목을 시료 1~n번까지. 하나라도 NG면 LOT과 하위 LOT을 보류한다. "
             + "같은 값을 다시 보내면 처음 결과를, 다른 값이면 409 INSPECTION_DONE")
     @PostMapping
-    public InspectionResponse inspect(@PathVariable String lotNo, @Valid @RequestBody InspectRequest req) {
-        return InspectionResponse.from(inspectionService.inspect(lotNo, req.toCommand()));
+    public InspectionResponse inspect(@PathVariable String lotNo, @Valid @RequestBody InspectRequest req,
+                                      @LoginWorker String workerId) {
+        return InspectionResponse.from(inspectionService.inspect(lotNo, req.toCommand(workerId)));
     }
 }

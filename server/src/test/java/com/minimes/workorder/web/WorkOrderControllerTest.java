@@ -1,5 +1,7 @@
 package com.minimes.workorder.web;
 
+import com.minimes.support.TestLogin;
+import org.springframework.context.annotation.Import;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TestLogin.AsAdmin.class)
 @ActiveProfiles("test")
 @Transactional
 @Sql("/sql/work-order-fixture.sql")

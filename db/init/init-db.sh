@@ -3,6 +3,7 @@
 #   - 테이블이 없으면(새 볼륨): db/ddl 전부 → db/seed
 #   - 테이블이 있으면(이미 만든 DB): 없을 때만 추가하는 06번부터 다시 실행 (새로 생긴 DDL을 반영)
 #   - 기준정보가 비어 있으면 seed를 넣는다 (지난번에 DDL만 하고 멈춘 경우)
+#   - 비밀번호가 없는 작업자가 있으면 시연용 비밀번호를 넣는다 (로그인 전에 만든 DB)
 # 몇 번을 다시 실행해도 결과가 같다.
 set -euo pipefail
 
@@ -45,6 +46,12 @@ if [ "$items" = "0" ]; then
     for f in /db/seed/*.sql; do run "$f"; done
 else
     echo "초기 데이터는 이미 있습니다 (품목 ${items}개)"
+    # 로그인을 넣기 전에 만든 DB: 비밀번호가 없는 작업자에게 시연용 비밀번호를 넣는다
+    no_password=$(query "SELECT COUNT(*) FROM minimes.dbo.worker WHERE password_hash IS NULL")
+    if [ "$no_password" != "0" ]; then
+        echo "비밀번호가 없는 작업자 ${no_password}명: 시연용 비밀번호를 넣습니다"
+        run /db/seed/03_demo_password.sql
+    fi
 fi
 
 echo "DB 준비 끝"

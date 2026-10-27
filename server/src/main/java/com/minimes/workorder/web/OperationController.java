@@ -1,5 +1,6 @@
 package com.minimes.workorder.web;
 
+import com.minimes.auth.config.LoginWorker;
 import com.minimes.lot.service.LotService;
 import com.minimes.master.service.MasterQueryService;
 import com.minimes.lot.service.ResultLots;
@@ -10,7 +11,6 @@ import com.minimes.workorder.service.OperationService.ReportCommand;
 import com.minimes.workorder.web.OperationDtos.CancelRequest;
 import com.minimes.workorder.web.OperationDtos.ReportRequest;
 import com.minimes.workorder.web.OperationDtos.ResultResponse;
-import com.minimes.workorder.web.OperationDtos.WorkerRequest;
 import com.minimes.workorder.web.WorkOrderDtos.OperationResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
-/** 현장 POP가 부르는 API. 작업자는 로그인 대신 사번(workerId)을 요청마다 보낸다. */
+/** 현장 POP가 부르는 API. 누가 했는지는 로그인 토큰의 사번으로 남긴다. */
 @Tag(name = "공정 작업 (POP)", description = "작업 목록, 공정 시작, 실적 등록·취소, 공정 완료")
 @RestController
 @RequestMapping("/api")
@@ -47,16 +47,17 @@ public class OperationController {
 
     @Operation(summary = "공정 시작 (대기 → 진행)", description = "작업지시가 대기면 함께 진행으로 바뀐다")
     @PostMapping("/operations/{woOpId}/start")
-    public OperationResponse start(@PathVariable long woOpId, @Valid @RequestBody WorkerRequest req) {
-        return OperationResponse.from(operationService.start(woOpId, req.workerId()), masterQueryService.processNames());
+    public OperationResponse start(@PathVariable long woOpId, @LoginWorker String workerId) {
+        return OperationResponse.from(operationService.start(woOpId, workerId), masterQueryService.processNames());
     }
 
     @Operation(summary = "실적 등록", description = "양품 수량, 불량 내역, 투입 LOT. 양품으로 산출 LOT을 만든다. "
             + "같은 requestId로 다시 보내면 처음 저장한 실적을 돌려준다")
     @PostMapping("/operations/{woOpId}/results")
     @ResponseStatus(HttpStatus.CREATED)
-    public ResultResponse report(@PathVariable long woOpId, @Valid @RequestBody ReportRequest req) {
-        ReportCommand command = new ReportCommand(req.requestId(), req.workerId(),
+    public ResultResponse report(@PathVariable long woOpId, @Valid @RequestBody ReportRequest req,
+                                 @LoginWorker String workerId) {
+        ReportCommand command = new ReportCommand(req.requestId(), workerId,
                 req.equipCode() == null || req.equipCode().isBlank() ? null : req.equipCode(),
                 req.goodQty(), req.defectLines(), req.lotInputs());
         return withLots(List.of(operationService.report(woOpId, command))).getFirst();
@@ -70,14 +71,15 @@ public class OperationController {
 
     @Operation(summary = "공정 완료 (진행 → 완료)", description = "마지막 공정까지 끝나면 작업지시도 완료된다")
     @PostMapping("/operations/{woOpId}/complete")
-    public OperationResponse complete(@PathVariable long woOpId, @Valid @RequestBody WorkerRequest req) {
-        return OperationResponse.from(operationService.complete(woOpId, req.workerId()), masterQueryService.processNames());
+    public OperationResponse complete(@PathVariable long woOpId, @LoginWorker String workerId) {
+        return OperationResponse.from(operationService.complete(woOpId, workerId), masterQueryService.processNames());
     }
 
     @Operation(summary = "실적 취소", description = "행을 지우지 않고 취소 표시. 공정 합계에서 빠진다. 마감한 작업지시는 불가")
     @PostMapping("/results/{resultId}/cancel")
-    public ResultResponse cancel(@PathVariable long resultId, @Valid @RequestBody CancelRequest req) {
-        return withLots(List.of(operationService.cancel(resultId, req.workerId(), req.reason()))).getFirst();
+    public ResultResponse cancel(@PathVariable long resultId, @Valid @RequestBody CancelRequest req,
+                                 @LoginWorker String workerId) {
+        return withLots(List.of(operationService.cancel(resultId, workerId, req.reason()))).getFirst();
     }
 
     private List<ResultResponse> withLots(List<WorkResult> results) {

@@ -1,5 +1,6 @@
 package com.minimes.lot.web;
 
+import com.minimes.auth.config.LoginWorker;
 import com.minimes.lot.domain.LotStatus;
 import com.minimes.lot.service.LotHoldService;
 import com.minimes.lot.service.LotHoldService.HoldCommand;
@@ -48,9 +49,9 @@ public class LotController {
     @Operation(summary = "원자재 입고", description = "LOT 관리 원자재(환봉, 키홈 핀)를 입고해 LOT을 만든다. LOT 번호: 품번-yyMMdd-001")
     @PostMapping("/lots/receive")
     @ResponseStatus(HttpStatus.CREATED)
-    public LotResponse receive(@Valid @RequestBody ReceiveRequest req) {
+    public LotResponse receive(@Valid @RequestBody ReceiveRequest req, @LoginWorker String workerId) {
         String supplierLotNo = req.supplierLotNo() == null || req.supplierLotNo().isBlank() ? null : req.supplierLotNo().trim();
-        return LotResponse.from(lotService.receive(new ReceiveCommand(req.itemCode(), req.qty(), supplierLotNo, req.workerId())));
+        return LotResponse.from(lotService.receive(new ReceiveCommand(req.itemCode(), req.qty(), supplierLotNo, workerId)));
     }
 
     @Operation(summary = "품목의 LOT 목록", description = "최근 것부터 100개. status를 주면 그 상태만 (ACTIVE, CONSUMED ...)")
@@ -82,18 +83,20 @@ public class LotController {
 
     @Operation(summary = "품질 보류", description = "남은 수량이 있는 LOT을 보류해 투입을 막는다. includeDownstream이면 이 LOT이 들어간 하위 LOT도 함께. 품질(QC)·관리자(ADMIN)만")
     @PostMapping("/lots/{lotNo}/hold")
-    public HoldResponse hold(@PathVariable String lotNo, @Valid @RequestBody HoldRequest req) {
-        return HoldResponse.from(holdService.hold(lotNo, command(req)));
+    public HoldResponse hold(@PathVariable String lotNo, @Valid @RequestBody HoldRequest req,
+                             @LoginWorker String workerId) {
+        return HoldResponse.from(holdService.hold(lotNo, command(req, workerId)));
     }
 
     @Operation(summary = "보류 해제", description = "보류 중인 LOT을 다시 쓸 수 있게 한다. includeDownstream이면 하위 LOT도 함께. 품질(QC)·관리자(ADMIN)만")
     @PostMapping("/lots/{lotNo}/release")
-    public HoldResponse release(@PathVariable String lotNo, @Valid @RequestBody HoldRequest req) {
-        return HoldResponse.from(holdService.release(lotNo, command(req)));
+    public HoldResponse release(@PathVariable String lotNo, @Valid @RequestBody HoldRequest req,
+                                @LoginWorker String workerId) {
+        return HoldResponse.from(holdService.release(lotNo, command(req, workerId)));
     }
 
-    private static HoldCommand command(HoldRequest req) {
-        return new HoldCommand(req.workerId(), req.reason().trim(), req.includeDownstream());
+    private static HoldCommand command(HoldRequest req, String workerId) {
+        return new HoldCommand(workerId, req.reason().trim(), Boolean.TRUE.equals(req.includeDownstream()));
     }
 
     @Operation(summary = "공정에 투입할 LOT (POP)", description = "투입할 품목마다 쓸 수 있는 LOT, 먼저 들어온 것부터")

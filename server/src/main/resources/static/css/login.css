@@ -1,0 +1,36 @@
+/* 로그인 화면: 가운데 카드 하나 */
+.login {
+    max-width: 360px;
+    margin: 8vh auto 0;
+    padding: 28px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.login h1 { margin: 0; font-size: 24px; }
+.login .sub { margin: 6px 0 18px; color: var(--muted); }
+.login-form { display: flex; flex-direction: column; gap: 12px; }
+.login-form label { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--muted); }
+.login-form input {
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    font: inherit;
+    font-size: 16px;   /* 16px 미만이면 휴대폰이 입력할 때 화면을 확대한다 */
+    color: var(--text);
+}
+.login-form button {
+    margin-top: 4px;
+    padding: 10px;
+    border: 0;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.login-form button:disabled { opacity: 0.6; cursor: default; }
+.login-error, .login-notice { margin: 0; color: var(--down); font-size: 14px; }
+.login-notice { margin-bottom: 12px; }
+.login-demo { margin: 18px 0 0; font-size: 13px; }

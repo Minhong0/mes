@@ -45,6 +45,10 @@ management:
         include: health,info
 
 mes:
+  auth:
+    jwt-secret: ${JWT_SECRET:}   # 토큰 서명 키 (32바이트 이상). 비우면 켤 때마다 임시 키 (다시 켜면 다시 로그인)
+    token-ttl: PT12H             # 한 교대. 지나면 다시 로그인
+    cookie-name: MES_TOKEN       # 관리자 웹이 토큰을 담는 쿠키 (POP는 Authorization 헤더)
   mqtt:
     enabled: true                               # false면 수집기를 만들지 않는다 (테스트 프로필)
     broker-url: ${MQTT_URL:tcp://localhost:1883}

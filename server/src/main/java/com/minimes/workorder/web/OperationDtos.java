@@ -22,9 +22,6 @@ public final class OperationDtos {
     private OperationDtos() {
     }
 
-    public record WorkerRequest(@NotBlank(message = "작업자는 필수입니다.") String workerId) {
-    }
-
     /**
      * @param requestId POP가 만든 요청 ID(GUID). 응답을 못 받아 다시 보낼 때도 같은 값을 보낸다
      * @param equipCode 작업한 설비 (비워도 된다)
@@ -32,7 +29,6 @@ public final class OperationDtos {
      */
     public record ReportRequest(
             @NotBlank(message = "요청 ID는 필수입니다.") @Size(max = 50) String requestId,
-            @NotBlank(message = "작업자는 필수입니다.") String workerId,
             String equipCode,
             @PositiveOrZero(message = "양품 수량은 0 이상이어야 합니다.") int goodQty,
             @NotNull List<@Valid DefectRequest> defects,
@@ -60,7 +56,6 @@ public final class OperationDtos {
     }
 
     public record CancelRequest(
-            @NotBlank(message = "작업자는 필수입니다.") String workerId,
             @NotBlank(message = "취소 사유는 필수입니다.") @Size(max = 200) String reason
     ) {
     }

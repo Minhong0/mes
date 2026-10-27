@@ -1,5 +1,9 @@
 package com.minimes.integration;
 
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import com.minimes.support.TestLogin;
+import org.springframework.context.annotation.Import;
 import com.jayway.jsonpath.JsonPath;
 import com.minimes.equipment.mqtt.EquipmentMessage;
 import com.minimes.equipment.service.EquipmentDataService;
@@ -24,6 +28,7 @@ import java.sql.DriverManager;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.closeTo;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
@@ -44,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Tag("integration")
 @SpringBootTest
 @AutoConfigureMockMvc
+@Import(TestLogin.AsAdmin.class)
 class MssqlIntegrationTest {
 
     static final MSSQLServerContainer MSSQL =
@@ -259,10 +265,10 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.equipment[3].equipCode").value("CNC04"))
                 .andExpect(jsonPath("$.equipment[3].alarms[0].alarmType").value("VIBRATION_UCL"));
 
-        mockMvc.perform(post("/api/alarms/{id}/ack", alarmId).contentType(MediaType.APPLICATION_JSON).content("{\"ackBy\":\"kim\"}"))
+        mockMvc.perform(post("/api/alarms/{id}/ack", alarmId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ackBy").value("kim"));
-        mockMvc.perform(post("/api/alarms/{id}/ack", alarmId).contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(jsonPath("$.ackBy").value("W9001"));   // 확인자는 로그인한 사번
+        mockMvc.perform(post("/api/alarms/{id}/ack", alarmId))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ALARM_ALREADY_ACKNOWLEDGED"));
     }
@@ -295,12 +301,12 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$[?(@.woNo == '" + woNo + "')].processName").value(hasItem("CNC 선삭")));
 
         mockMvc.perform(post("/api/operations/{id}/start", op10).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W1001\"}"))
+                        .with(TestLogin.as("W1001", "OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RUN"));
 
         String bar = receiveBar(10);
-        String report = "{\"requestId\":\"it-req-1\",\"workerId\":\"W1001\",\"equipCode\":\"CNC01\",\"goodQty\":8,"
+        String report = "{\"requestId\":\"it-req-1\",\"equipCode\":\"CNC01\",\"goodQty\":8,"
                 + "\"defects\":[{\"defectType\":\"OVERSIZE\",\"qty\":2}],\"inputs\":[{\"lotNo\":\"" + bar + "\",\"qty\":10}]}";
         String first = mockMvc.perform(post("/api/operations/{id}/results", op10).contentType(MediaType.APPLICATION_JSON).content(report))
                 .andExpect(status().isCreated())
@@ -311,11 +317,11 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.resultId").value(resultId));   // 다시 보내도 같은 실적
 
         mockMvc.perform(post("/api/operations/{id}/results", op10).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"requestId\":\"it-req-2\",\"workerId\":\"W1001\",\"goodQty\":-1,\"defects\":[]}"))
+                        .content("{\"requestId\":\"it-req-2\",\"goodQty\":-1,\"defects\":[]}"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/results/{id}/cancel", resultId).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W1001\",\"reason\":\"수량 오입력\"}"))
+                        .with(TestLogin.as("W1001", "OPERATOR")).content("{\"reason\":\"수량 오입력\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.cancelled").value(true));
 
@@ -325,7 +331,7 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.operations[0].defectQty").value(0));
 
         mockMvc.perform(post("/api/operations/{id}/complete", op10).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W1001\"}"))
+                        .with(TestLogin.as("W1001", "OPERATOR")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("DONE"));
     }
@@ -372,10 +378,10 @@ class MssqlIntegrationTest {
         int downtimeId = JsonPath.read(downtimes, "$[0].downtimeId");
 
         mockMvc.perform(put("/api/downtimes/{id}/reason", downtimeId).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W1001\",\"dtCat\":\"MATERIAL\",\"dtSub\":\"BRK_SENSOR\"}"))
+                        .with(TestLogin.as("W1001", "OPERATOR")).content("{\"dtCat\":\"MATERIAL\",\"dtSub\":\"BRK_SENSOR\"}"))
                 .andExpect(status().isBadRequest());   // 소분류가 대분류에 속하지 않는다
         mockMvc.perform(put("/api/downtimes/{id}/reason", downtimeId).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W1001\",\"dtCat\":\"MATERIAL\",\"dtSub\":\"MAT_NOT_RECEIVED\",\"note\":\"소재 입고 지연\"}"))
+                        .with(TestLogin.as("W1001", "OPERATOR")).content("{\"dtCat\":\"MATERIAL\",\"dtSub\":\"MAT_NOT_RECEIVED\",\"note\":\"소재 입고 지연\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.workerId").value("W1001"))
                 .andExpect(jsonPath("$.reasonAt").isNotEmpty());
@@ -397,7 +403,7 @@ class MssqlIntegrationTest {
     @DisplayName("LOT 추적 (재귀 CTE, UPDLOCK): 환봉 입고 → 선삭 → 밀링 → 열처리 Batch, 역방향·정방향 추적, 취소한 실적은 빠진다")
     void lotTrace() throws Exception {
         mockMvc.perform(post("/api/lots/receive").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"itemCode\":\"RM-OIL-001\",\"qty\":20,\"workerId\":\"W1001\"}"))
+                        .content("{\"itemCode\":\"RM-OIL-001\",\"qty\":20}"))
                 .andExpect(status().isBadRequest());   // 절삭유는 LOT 관리 품목이 아니다
         String barA = receiveBar(10);
         String barB = receiveBar(10);
@@ -450,7 +456,7 @@ class MssqlIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         int extraId = JsonPath.read(extra, "$.resultId");
         mockMvc.perform(post("/api/results/{id}/cancel", extraId).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W1001\",\"reason\":\"수량 오입력\"}"))
+                        .with(TestLogin.as("W1001", "OPERATOR")).content("{\"reason\":\"수량 오입력\"}"))
                 .andExpect(status().isOk());
 
         // 정방향: 환봉 barB → 선삭 t2 → 밀링 m2 → 열처리 batch
@@ -469,7 +475,7 @@ class MssqlIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
         int m2Result = JsonPath.read(results, "$[0].resultId");
         mockMvc.perform(post("/api/results/{id}/cancel", m2Result).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W1001\",\"reason\":\"수량 오입력\"}"))
+                        .with(TestLogin.as("W1001", "OPERATOR")).content("{\"reason\":\"수량 오입력\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("LOT_IN_USE"));
 
@@ -501,17 +507,17 @@ class MssqlIntegrationTest {
         startOperation(op20);
         String milled = reportLot(op20, 3, 0, turned, 3);
 
-        String hold = "{\"workerId\":\"%s\",\"reason\":\"치수 불량 의심\",\"includeDownstream\":true}";
-        mockMvc.perform(post("/api/lots/{lotNo}/hold", bar).contentType(MediaType.APPLICATION_JSON)
-                        .content(hold.formatted("W1001")))
+        String hold = "{\"reason\":\"치수 불량 의심\",\"includeDownstream\":true}";
+        mockMvc.perform(post("/api/lots/{lotNo}/hold", bar).with(TestLogin.as("W1001", "OPERATOR"))
+                        .contentType(MediaType.APPLICATION_JSON).content(hold))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("NOT_ALLOWED"));
         mockMvc.perform(post("/api/lots/{lotNo}/hold", bar).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W6001\",\"reason\":\" \"}"))
+                        .with(TestLogin.as("W6001", "QC")).content("{\"reason\":\" \"}"))
                 .andExpect(status().isBadRequest());
 
         mockMvc.perform(post("/api/lots/{lotNo}/hold", bar).contentType(MediaType.APPLICATION_JSON)
-                        .content(hold.formatted("W6001")))
+                        .with(TestLogin.as("W6001", "QC")).content(hold))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.changed[*].lotNo").value(contains(bar, turned, milled)))
                 .andExpect(jsonPath("$.changed[1].status").value("HOLD"))
@@ -527,7 +533,7 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.forward[*].status").value(contains("HOLD", "HOLD")));
 
         mockMvc.perform(post("/api/lots/{lotNo}/release", bar).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W9001\",\"reason\":\"재검사 합격\",\"includeDownstream\":true}"))
+                        .with(TestLogin.as("W9001", "ADMIN")).content("{\"reason\":\"재검사 합격\",\"includeDownstream\":true}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.changed.length()").value(3));
         reportLot(op20, 2, 0, turned, 2);
@@ -561,10 +567,10 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$.judgement").doesNotExist());
 
         mockMvc.perform(post("/api/lots/{lotNo}/inspection", turned).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W1001\",\"measurements\":[{\"inspectCode\":\"OD\",\"sampleNo\":1}]}"))
+                        .with(TestLogin.as("W1001", "OPERATOR")).content("{\"measurements\":[{\"inspectCode\":\"OD\",\"sampleNo\":1}]}"))
                 .andExpect(status().isBadRequest());
 
-        String ng = "{\"workerId\":\"W1001\",\"measurements\":["
+        String ng = "{\"measurements\":["
                 + "{\"inspectCode\":\"OD\",\"sampleNo\":1,\"value\":38.01},{\"inspectCode\":\"OD\",\"sampleNo\":2,\"value\":38.06},"
                 + "{\"inspectCode\":\"RA\",\"sampleNo\":1,\"value\":1.2},{\"inspectCode\":\"RA\",\"sampleNo\":2,\"value\":1.4}]}";
         mockMvc.perform(post("/api/lots/{lotNo}/inspection", turned).contentType(MediaType.APPLICATION_JSON).content(ng))
@@ -606,7 +612,7 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$[?(@.toolCode == 'T-CNC01-INS')].equipName").value(hasItem("CNC 선반 #1")));
 
         mockMvc.perform(post("/api/tools/{code}/change", "T-CNC04-EM").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W2001\",\"reason\":\"파손\"}"))
+                        .with(TestLogin.as("W2001", "OPERATOR")).content("{\"reason\":\"파손\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tool.usedCount").value(0))
                 .andExpect(jsonPath("$.tool.state").value("OK"))
@@ -615,14 +621,35 @@ class MssqlIntegrationTest {
                 .andExpect(jsonPath("$[0].reason").value("파손"))
                 .andExpect(jsonPath("$[0].workerId").value("W2001"));
         mockMvc.perform(post("/api/tools/{code}/change", "T-NONE").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W2001\"}"))
+                        .with(TestLogin.as("W2001", "OPERATOR")).content("{}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("TOOL_NOT_FOUND"));
     }
 
+    @Autowired
+    JwtDecoder jwtDecoder;
+
+    @Test
+    @DisplayName("로그인 (DDL 13 비밀번호 컬럼, seed 03 시연용 비밀번호): W9001/1234면 관리자 토큰, 틀리면 401")
+    void login() throws Exception {
+        String body = mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W9001\",\"password\":\"1234\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.worker.role").value("ADMIN"))
+                .andReturn().getResponse().getContentAsString();
+        Jwt token = jwtDecoder.decode(JsonPath.read(body, "$.accessToken"));
+        assertThat(token.getSubject()).isEqualTo("W9001");
+        assertThat(token.getClaimAsString("role")).isEqualTo("ADMIN");
+
+        mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"workerId\":\"W9001\",\"password\":\"9999\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
+    }
+
     private String receiveBar(int qty) throws Exception {
         String body = mockMvc.perform(post("/api/lots/receive").contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"itemCode\":\"RM-SCM-001\",\"qty\":" + qty + ",\"supplierLotNo\":\"SUP-IT\",\"workerId\":\"W1001\"}"))
+                        .content("{\"itemCode\":\"RM-SCM-001\",\"qty\":" + qty + ",\"supplierLotNo\":\"SUP-IT\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("ACTIVE"))
                 .andReturn().getResponse().getContentAsString();
@@ -631,7 +658,7 @@ class MssqlIntegrationTest {
 
     private void startOperation(int woOpId) throws Exception {
         mockMvc.perform(post("/api/operations/{id}/start", woOpId).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"workerId\":\"W1001\"}"))
+                        .with(TestLogin.as("W1001", "OPERATOR")))
                 .andExpect(status().isOk());
     }
 
@@ -650,7 +677,7 @@ class MssqlIntegrationTest {
             inputs.append(i == 0 ? "" : ",").append("{\"lotNo\":\"%s\",\"qty\":%s}".formatted(lotsAndQty[i], lotsAndQty[i + 1]));
         }
         String defects = defect == 0 ? "" : "{\"defectType\":\"OVERSIZE\",\"qty\":%d}".formatted(defect);
-        return "{\"requestId\":\"%s\",\"workerId\":\"W1001\",\"goodQty\":%d,\"defects\":[%s],\"inputs\":[%s]}"
+        return "{\"requestId\":\"%s\",\"goodQty\":%d,\"defects\":[%s],\"inputs\":[%s]}"
                 .formatted(UUID.randomUUID(), good, defects, inputs);
     }
 }
